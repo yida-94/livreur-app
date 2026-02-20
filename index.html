@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Livreurs · 固定用户版</title>
+    <title>Livreurs · Admin版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -55,13 +55,14 @@
             border: none;
             border-radius: 40px;
             font-weight: 700;
-            font-size: 1.1rem;
             cursor: pointer;
-            border-bottom: 4px solid #123d5c;
+            margin-bottom: 10px;
         }
-        .login-btn:active {
-            transform: translateY(2px);
-            border-bottom-width: 2px;
+        .register-link {
+            text-align: center;
+            color: #2f6d9e;
+            cursor: pointer;
+            margin-top: 15px;
         }
         .user-info-bar {
             background: #d4e3fd;
@@ -79,7 +80,38 @@
             padding: 8px 20px;
             border-radius: 30px;
             cursor: pointer;
-            font-weight: 600;
+        }
+        .admin-section {
+            background: #fff3e0;
+            border-radius: 30px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: 2px solid #ffb74d;
+        }
+        .admin-section h3 {
+            color: #e65100;
+            margin-bottom: 15px;
+        }
+        .user-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .user-tag {
+            background: white;
+            border: 2px solid #ffb74d;
+            border-radius: 40px;
+            padding: 8px 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .remove-user {
+            color: #f44336;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.2rem;
         }
         .user-selector {
             background: #f5faff;
@@ -98,8 +130,6 @@
             border: 2px solid #b0c8e5;
             border-radius: 40px;
             padding: 8px 18px;
-            font-weight: 600;
-            color: #1f4a7a;
             cursor: pointer;
         }
         .user-button.active {
@@ -245,10 +275,6 @@
             border-radius: 30px;
             cursor: pointer;
         }
-        .btn-delete:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
         .readonly-badge {
             background: #ff9800;
             color: white;
@@ -270,15 +296,32 @@
     </style>
 </head>
 <body>
-    <!-- 登录界面 -->
+    <!-- 登录/注册界面 -->
     <div class="login-overlay" id="loginOverlay" style="position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:1000;">
         <div class="login-box">
-            <h2>🔐 Connexion</h2>
-            <input type="text" class="login-input" id="loginUsername" placeholder="Nom d'utilisateur">
-            <input type="password" class="login-input" id="loginPassword" placeholder="Mot de passe">
-            <button class="login-btn" id="loginBtn">Se connecter</button>
+            <h2 id="loginTitle">🔐 Connexion</h2>
+            
+            <!-- 登录表单 -->
+            <div id="loginForm">
+                <input type="text" class="login-input" id="loginUsername" placeholder="Nom d'utilisateur">
+                <input type="password" class="login-input" id="loginPassword" placeholder="Mot de passe">
+                <button class="login-btn" id="loginBtn">Se connecter</button>
+                <div class="register-link" id="showRegister">Pas de compte ? S'inscrire</div>
+            </div>
+
+            <!-- 注册表单 -->
+            <div id="registerForm" style="display:none;">
+                <input type="text" class="login-input" id="regUsername" placeholder="Nom d'utilisateur">
+                <input type="password" class="login-input" id="regPassword" placeholder="Mot de passe">
+                <input type="password" class="login-input" id="regConfirm" placeholder="Confirmer mot de passe">
+                <button class="login-btn" id="registerBtn">S'inscrire</button>
+                <div class="register-link" id="showLogin">Retour à la connexion</div>
+            </div>
+
+            <!-- 固定账号提示 -->
             <div style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 20px;">
                 <p style="color: #2e7d32; font-weight: bold;">📝 固定账号：</p>
+                <p>👤 admin / 1234 (管理员)</p>
                 <p>👤 tayfun / 1909</p>
                 <p>👤 xuefeng / 1998</p>
                 <p>👤 steve / 94</p>
@@ -290,10 +333,17 @@
     <div class="app-container" id="app" style="display: none;">
         <div class="user-info-bar">
             <span id="currentUserDisplay">👤 </span>
+            <span id="userRole"></span>
             <button class="logout-btn" id="logoutBtn">Déconnexion</button>
         </div>
 
-        <!-- 用户选择器（查看其他人数据） -->
+        <!-- 管理员专属区域 -->
+        <div class="admin-section" id="adminSection" style="display: none;">
+            <h3>👥 使用者管理 (管理员)</h3>
+            <div class="user-list" id="userList"></div>
+        </div>
+
+        <!-- 用户选择器 -->
         <div class="user-selector">
             <div class="selector-label">👁️ Voir les données d'autres utilisateurs</div>
             <div class="user-buttons" id="userSelectorButtons"></div>
@@ -350,44 +400,52 @@
 
     <script>
         (function() {
-            // ==================== 固定用户数据 ====================
-            const USERS = {
-                'tayfun': '1909',
-                'xuefeng': '1998',
-                'steve': '94'
-            };
-
-            // Supabase 配置
+            // Supabase配置（用您的）
             const supabase = window.supabase.createClient(
                 'https://jmywqokewgnnypqugqev.supabase.co',
                 'sb_publishable_XXkyyl1z7V7D3w1x1sfppA_OPDEFkig'
             );
 
-            // 全局状态
+            // 固定用户（包含管理员）
+            const FIXED_USERS = {
+                'admin': '1234',
+                'tayfun': '1909',
+                'xuefeng': '1998',
+                'steve': '94'
+            };
+
             let currentUser = null;
-            let currentUserId = null;
             let viewingUser = null;
-            let viewingUserId = null;
             let currentDriver = 'Edwin';
             let inputDate = new Date().toISOString().split('T')[0];
             let viewDate = new Date().toISOString().split('T')[0];
+            let allUsers = Object.keys(FIXED_USERS);
 
-            // DOM 元素
+            // DOM元素
             const loginOverlay = document.getElementById('loginOverlay');
             const appContainer = document.getElementById('app');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
             const loginUsername = document.getElementById('loginUsername');
             const loginPassword = document.getElementById('loginPassword');
             const loginBtn = document.getElementById('loginBtn');
+            const showRegister = document.getElementById('showRegister');
+            const showLogin = document.getElementById('showLogin');
+            const regUsername = document.getElementById('regUsername');
+            const regPassword = document.getElementById('regPassword');
+            const regConfirm = document.getElementById('regConfirm');
+            const registerBtn = document.getElementById('registerBtn');
             const logoutBtn = document.getElementById('logoutBtn');
             const currentUserDisplay = document.getElementById('currentUserDisplay');
+            const userRole = document.getElementById('userRole');
+            const adminSection = document.getElementById('adminSection');
             const userSelectorButtons = document.getElementById('userSelectorButtons');
+            const userList = document.getElementById('userList');
             const inputSection = document.getElementById('inputSection');
             const driverTabsEl = document.getElementById('driverTabs');
             const currentViewHint = document.getElementById('currentViewHint');
             const inputDatePicker = document.getElementById('inputDate');
             const viewDatePicker = document.getElementById('viewDate');
-            const inputDateHint = document.getElementById('inputDateHint');
-            const viewDateHint = document.getElementById('viewDateHint');
             const customerListEl = document.getElementById('customerList');
             const loadingMessage = document.getElementById('loadingMessage');
             const optimizeBtn = document.getElementById('optimizeRouteBtn');
@@ -425,11 +483,23 @@
             if (timeType) timeType.addEventListener('change', renderTimeInput);
 
             // 登录
-            function login(username, password) {
-                if (USERS[username] && USERS[username] === password) {
+            async function login(username, password) {
+                // 检查固定用户
+                if (FIXED_USERS[username] && FIXED_USERS[username] === password) {
                     currentUser = username;
                     viewingUser = username;
                     currentUserDisplay.innerText = `👤 ${currentUser}`;
+                    
+                    // 如果是管理员，显示管理员区域
+                    if (username === 'admin') {
+                        userRole.innerText = ' (管理员)';
+                        adminSection.style.display = 'block';
+                        renderUserList();
+                    } else {
+                        userRole.innerText = '';
+                        adminSection.style.display = 'none';
+                    }
+                    
                     loginOverlay.style.display = 'none';
                     appContainer.style.display = 'block';
                     
@@ -437,66 +507,188 @@
                     
                     renderUserSelector();
                     renderDriverTabs();
-                    loadCustomers();
+                    await loadCustomers();
                     updateInputSectionState();
                     updateHints();
                     return true;
                 }
+                
+                // 检查注册用户（从数据库）
+                try {
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('username', username)
+                        .eq('password', password)
+                        .single();
+                    
+                    if (data) {
+                        currentUser = username;
+                        viewingUser = username;
+                        currentUserDisplay.innerText = `👤 ${currentUser}`;
+                        userRole.innerText = '';
+                        adminSection.style.display = 'none';
+                        
+                        loginOverlay.style.display = 'none';
+                        appContainer.style.display = 'block';
+                        
+                        currentDriver = 'Edwin';
+                        
+                        renderUserSelector();
+                        renderDriverTabs();
+                        await loadCustomers();
+                        updateInputSectionState();
+                        updateHints();
+                        return true;
+                    }
+                } catch (e) {
+                    console.log('数据库用户不存在');
+                }
+                
                 return false;
             }
 
-            // 登出
-            function logout() {
-                currentUser = null;
-                viewingUser = null;
-                appContainer.style.display = 'none';
-                loginOverlay.style.display = 'flex';
-                loginUsername.value = '';
-                loginPassword.value = '';
-            }
-
-            // 登录按钮
-            loginBtn.addEventListener('click', () => {
-                const username = loginUsername.value.trim();
-                const password = loginPassword.value.trim();
-                if (login(username, password)) {
-                    // 成功
-                } else {
-                    alert('Nom d\'utilisateur ou mot de passe incorrect');
+            // 注册
+            async function register(username, password) {
+                // 检查是否已存在
+                if (FIXED_USERS[username]) {
+                    alert('用户名已存在');
+                    return false;
                 }
-            });
-
-            // 回车登录
-            if (loginPassword) {
-                loginPassword.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') loginBtn.click();
-                });
+                
+                try {
+                    // 检查数据库
+                    const { data: existing } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('username', username);
+                    
+                    if (existing && existing.length > 0) {
+                        alert('用户名已存在');
+                        return false;
+                    }
+                    
+                    // 插入新用户
+                    const { error } = await supabase
+                        .from('users')
+                        .insert([{
+                            username: username,
+                            password: password,
+                            created_at: new Date().toISOString()
+                        }]);
+                    
+                    if (error) throw error;
+                    
+                    alert('注册成功，请登录');
+                    return true;
+                } catch (error) {
+                    console.error('注册失败:', error);
+                    alert('注册失败');
+                    return false;
+                }
             }
 
-            logoutBtn.addEventListener('click', logout);
+            // 管理员删除用户
+            window.removeUser = async function(username) {
+                if (currentUser !== 'admin') return;
+                
+                if (username === 'admin') {
+                    alert('不能删除管理员');
+                    return;
+                }
+                
+                if (confirm(`确定删除用户 ${username} 吗？`)) {
+                    try {
+                        // 删除用户的顾客数据
+                        await supabase
+                            .from('customers')
+                            .delete()
+                            .eq('username', username);
+                        
+                        // 删除用户
+                        await supabase
+                            .from('users')
+                            .delete()
+                            .eq('username', username);
+                        
+                        renderUserList();
+                        renderUserSelector();
+                    } catch (error) {
+                        console.error('删除失败:', error);
+                    }
+                }
+            };
+
+            // 渲染用户列表（管理员）
+            async function renderUserList() {
+                if (currentUser !== 'admin') return;
+                
+                try {
+                    // 获取注册用户
+                    const { data: registered } = await supabase
+                        .from('users')
+                        .select('username');
+                    
+                    // 合并固定用户和注册用户
+                    const allUsernames = [
+                        ...Object.keys(FIXED_USERS).filter(u => u !== 'admin'),
+                        ...(registered || []).map(u => u.username)
+                    ];
+                    
+                    let html = '';
+                    allUsernames.forEach(username => {
+                        html += `
+                            <div class="user-tag">
+                                👤 ${username}
+                                <span class="remove-user" onclick="removeUser('${username}')">✕</span>
+                            </div>
+                        `;
+                    });
+                    
+                    userList.innerHTML = html || '<p>暂无其他用户</p>';
+                } catch (error) {
+                    console.error('加载用户失败:', error);
+                }
+            }
 
             // 渲染用户选择器
-            function renderUserSelector() {
-                let html = '';
-                Object.keys(USERS).forEach(user => {
-                    const activeClass = (viewingUser === user) ? 'active' : '';
-                    const ownClass = (user === currentUser) ? 'own' : '';
-                    const label = user === currentUser ? `${user} (moi)` : user;
-                    html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${user}">👤 ${label}</button>`;
-                });
-                userSelectorButtons.innerHTML = html;
-
-                document.querySelectorAll('.user-button').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        viewingUser = btn.dataset.user;
-                        renderUserSelector();
-                        renderDriverTabs();
-                        loadCustomers();
-                        updateInputSectionState();
-                        updateHints();
-                        routeOutputDiv.style.display = 'none';
+            async function renderUserSelector() {
+                try {
+                    // 获取注册用户
+                    const { data: registered } = await supabase
+                        .from('users')
+                        .select('username');
+                    
+                    // 合并固定用户（不包括admin）
+                    const allUsernames = [
+                        ...Object.keys(FIXED_USERS).filter(u => u !== 'admin'),
+                        ...(registered || []).map(u => u.username)
+                    ];
+                    
+                    let html = '';
+                    allUsernames.forEach(username => {
+                        const activeClass = (viewingUser === username) ? 'active' : '';
+                        const ownClass = (username === currentUser) ? 'own' : '';
+                        const label = username === currentUser ? `${username} (moi)` : username;
+                        html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${username}">👤 ${label}</button>`;
                     });
-                });
+                    
+                    userSelectorButtons.innerHTML = html;
+
+                    document.querySelectorAll('.user-button').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            viewingUser = btn.dataset.user;
+                            renderUserSelector();
+                            renderDriverTabs();
+                            loadCustomers();
+                            updateInputSectionState();
+                            updateHints();
+                            routeOutputDiv.style.display = 'none';
+                        });
+                    });
+                } catch (error) {
+                    console.error('加载用户失败:', error);
+                }
             }
 
             // 更新录入区域状态
@@ -531,10 +723,8 @@
 
             // 更新提示
             function updateHints() {
-                if (inputDateHint) inputDateHint.innerText = `Date d'ajout: ${inputDate}`;
-                if (viewDateHint) viewDateHint.innerText = `Date visualisée: ${viewDate}`;
                 if (currentViewHint) {
-                    currentViewHint.innerText = `Utilisateur: ${currentUser} | Vue: ${viewingUser} | Chauffeur: ${currentDriver} | Ajout: ${inputDate} | Visualisation: ${viewDate}`;
+                    currentViewHint.innerText = `Utilisateur: ${currentUser} | Vue: ${viewingUser} | Chauffeur: ${currentDriver} | Date: ${viewDate}`;
                 }
             }
 
@@ -542,7 +732,6 @@
             if (inputDatePicker) {
                 inputDatePicker.addEventListener('change', (e) => {
                     inputDate = e.target.value;
-                    updateHints();
                 });
             }
 
@@ -554,8 +743,6 @@
                     updateHints();
                 });
             }
-
-            // ==================== 数据库操作 ====================
 
             // 加载顾客
             async function loadCustomers() {
@@ -606,7 +793,7 @@
                 }
             }
 
-            // 更新顾客（标记出发）
+            // 更新顾客
             async function updateCustomer(customerId, updates) {
                 try {
                     const { error } = await supabase
@@ -795,7 +982,6 @@
                 }
                 customerListEl.innerHTML = html;
 
-                // 绑定事件
                 document.querySelectorAll('.btn-depart').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -843,7 +1029,6 @@
                         return;
                     }
 
-                    // 简单按时间排序
                     const optimized = pending.sort((a,b) => {
                         const getTime = (c) => {
                             if (c.time_req?.type === 'fixed') return c.time_req.value;
@@ -871,6 +1056,71 @@
                 } finally {
                     loadingMessage.style.display = 'none';
                 }
+            });
+
+            // 登录按钮
+            loginBtn.addEventListener('click', async () => {
+                const username = loginUsername.value.trim();
+                const password = loginPassword.value.trim();
+                const success = await login(username, password);
+                if (!success) {
+                    alert('Nom d\'utilisateur ou mot de passe incorrect');
+                }
+            });
+
+            // 回车登录
+            if (loginPassword) {
+                loginPassword.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') loginBtn.click();
+                });
+            }
+
+            // 显示注册
+            showRegister.addEventListener('click', () => {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+            });
+
+            showLogin.addEventListener('click', () => {
+                registerForm.style.display = 'none';
+                loginForm.style.display = 'block';
+            });
+
+            // 注册按钮
+            registerBtn.addEventListener('click', async () => {
+                const username = regUsername.value.trim();
+                const password = regPassword.value.trim();
+                const confirm = regConfirm.value.trim();
+                
+                if (!username || !password) {
+                    alert('Veuillez remplir tous les champs');
+                    return;
+                }
+                if (password !== confirm) {
+                    alert('Les mots de passe ne correspondent pas');
+                    return;
+                }
+                
+                const success = await register(username, password);
+                if (success) {
+                    registerForm.style.display = 'none';
+                    loginForm.style.display = 'block';
+                    regUsername.value = '';
+                    regPassword.value = '';
+                    regConfirm.value = '';
+                }
+            });
+
+            // 登出
+            logoutBtn.addEventListener('click', () => {
+                currentUser = null;
+                viewingUser = null;
+                appContainer.style.display = 'none';
+                loginOverlay.style.display = 'flex';
+                loginUsername.value = '';
+                loginPassword.value = '';
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
             });
 
             // 初始化
