@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Livreurs · Validation croisée · Version bilingue</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        }
+        body {
+            background: #e9eff5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .app-container {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            border-radius: 40px 40px 30px 30px;
+            box-shadow: 0 30px 50px rgba(0, 30, 50, 0.2);
+            overflow: hidden;
+            padding: 24px 20px 30px;
+            border: 1px solid rgba(255,255,255,0.6);
+        }
+
+        /* Login modal */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .login-box {
+            background: white;
+            border-radius: 50px;
+            padding: 40px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+        }
+        .login-box h2 {
+            color: #1d4a72;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .login-input {
+            width: 100%;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: 2px solid #b9cfe6;
+            border-radius: 40px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            background: #2f6d9e;
+            color: white;
+            border: none;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            border-bottom: 4px solid #123d5c;
+        }
+        .login-btn:active {
+            transform: translateY(2px);
+            border-bottom-width: 2px;
+        }
+        .register-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #2f6d9e;
+            cursor: pointer;
+        }
+
+        /* Admin section */
+        .user-section {
+            background: #f0f7ff;
+            border-radius: 30px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #c1d9f0;
+            display: none;
+        }
+        .user-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .user-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .user-tag {
+            background: white;
+            border: 2px solid #b0c8e5;
+            border-radius: 40px;
+            padding: 8px 18px;
+            font-weight: 600;
+            color: #1f4a7a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .add-user-form {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .add-user-form input {
+            flex: 1;
+            padding: 12px 18px;
+            border: 2px solid #b9cfe6;
+            border-radius: 40px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .btn-add-user {
+            background: #2f6d9e;
+            border: none;
+            color: white;
+            padding: 0 25px;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid #123d5c;
+        }
+
+        /* User info bar */
+        .user-info-bar {
+            background: #d4e3fd;
+            border-radius: 40px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logout-btn {
+            background: #e05a5a;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 3px solid #923e3e;
+        }
+
+        /* User selector */
+        .user-selector {
+            background: #f5faff;
+            border-radius: 30px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: 2px solid #c1d9f0;
+        }
+        .selector-label {
+            font-weight: 600;
+            color: #1d4a72;
+            margin-bottom: 10px;
+        }
+        .user-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .user-button {
+            background: white;
+            border: 2px solid #b0c8e5;
+            border-radius: 40px;
+            padding: 8px 18px;
+            font-weight: 600;
+            color: #1f4a7a;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .user-button.active {
+            background: #2b5879;
+            border-color: #2b5879;
+            color: white;
+        }
+        .user-button.own {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+
+        /* Date selection */
+        .dual-date-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .date-card {
+            flex: 1;
+            min-width: 250px;
+            background: #f5faff;
+            border-radius: 30px;
+            padding: 15px 20px;
+            border: 2px solid #c1d9f0;
+        }
+        .date-card .label {
+            font-weight: 600;
+            color: #1d4a72;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .date-picker-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #b9cfe6;
+            border-radius: 30px;
+            font-size: 1rem;
+            outline: none;
+            background: white;
+        }
+
+        /* Driver tabs */
+        .driver-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            background: #edf2f9;
+            padding: 6px;
+            border-radius: 50px;
+            flex-wrap: wrap;
+        }
+        .driver-tab {
+            flex: 1;
+            min-width: 80px;
+            border: none;
+            background: transparent;
+            padding: 12px 0;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #1e3f5c;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .driver-tab.active {
+            background: white;
+            box-shadow: 0 6px 16px rgba(0,60,120,0.15);
+            color: #003153;
+        }
+
+        /* Language toggle */
+        .lang-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+        }
+        .lang-btn {
+            background: #e3ecf5;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-weight: 600;
+            color: #234b6e;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-left: 8px;
+        }
+        .lang-btn.active {
+            background: #2b5879;
+            color: white;
+        }
+
+        /* Input section */
+        .input-section {
+            background: #f5faff;
+            border-radius: 30px;
+            padding: 18px 16px;
+            margin-bottom: 22px;
+            border: 1px solid #cbddec;
+        }
+        .input-section.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            background: #f0f0f0;
+        }
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1d4a72;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 8px;
+        }
+        .input-row {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .input-field {
+            background: white;
+            border-radius: 24px;
+            padding: 4px 20px;
+            border: 1px solid #b9cfe6;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .input-field input, .input-field select {
+            border: none;
+            padding: 14px 0;
+            width: 100%;
+            font-size: 0.95rem;
+            outline: none;
+            background: transparent;
+        }
+        .time-type-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .time-type-select {
+            flex: 2;
+        }
+        .time-input-container {
+            flex: 3;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .time-range {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .btn-add {
+            background: #2f6d9e;
+            border: none;
+            color: white;
+            font-weight: 700;
+            padding: 16px 10px;
+            border-radius: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+            border-bottom: 4px solid #123d5c;
+            margin-top: 10px;
+            font-size: 1rem;
+        }
+
+        /* Customer list */
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0 12px;
+        }
+        .list-header h3 {
+            color: #153e5a;
+        }
+        .customer-list {
+            list-style: none;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .customer-item {
+            background: #f8f9fc;
+            border-radius: 26px;
+            padding: 16px 18px;
+            border: 1px solid #c7daf0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .customer-item.departed {
+            background: #e3f0e3;
+            border-color: #7bb07b;
+        }
+        .customer-item.other-user {
+            border-left: 6px solid #ff9800;
+        }
+        .customer-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .info-main .name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #1d394b;
+        }
+        .info-main .addr {
+            font-size: 0.85rem;
+            color: #3f617f;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin: 4px 0 2px;
+        }
+        .meta-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .time-badge {
+            font-size: 0.75rem;
+            background: #ddeeff;
+            padding: 4px 12px;
+            border-radius: 30px;
+            display: inline-block;
+            color: #10344e;
+            font-weight: 600;
+        }
+        .added-time {
+            font-size: 0.7rem;
+            color: #6b7f99;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .added-by {
+            font-size: 0.7rem;
+            background: #e6d5b8;
+            padding: 4px 12px;
+            border-radius: 30px;
+            display: inline-block;
+            color: #5e3f1a;
+            font-weight: 600;
+        }
+        .departure-time {
+            font-size: 0.75rem;
+            color: #2d6e2d;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .validated-by {
+            font-size: 0.7rem;
+            background: #c8e6c9;
+            padding: 4px 12px;
+            border-radius: 30px;
+            display: inline-block;
+            color: #1e5a1e;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+        .item-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            align-items: center;
+        }
+        .btn-depart-customer {
+            background: #2b8c5e;
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            border-bottom: 3px solid #166b41;
+        }
+        .btn-depart-customer:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .btn-depart-customer.hidden {
+            display: none;
+        }
+        .btn-delete {
+            background: transparent;
+            border: 1px solid #d0ddee;
+            padding: 8px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            color: #8fa9c2;
+        }
+        .btn-delete:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .btn-delete.hidden {
+            display: none;
+        }
+        .readonly-badge {
+            background: #ff9800;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        /* Route planning */
+        .action-panel {
+            background: #eaf1fa;
+            border-radius: 30px;
+            padding: 22px 18px;
+            margin: 20px 0 10px;
+        }
+        .optimize-btn {
+            background: white;
+            border: 2px solid #ff9f4b;
+            color: #aa5f1e;
+            font-weight: 700;
+            padding: 16px 20px;
+            border-radius: 40px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-bottom: 18px;
+        }
+        .optimize-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .route-output {
+            background: #ffffffd9;
+            border-radius: 24px;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            border-left: 6px solid #f28c38;
+        }
+        .route-steps {
+            list-style: none;
+        }
+        .route-steps li {
+            padding: 10px 0;
+            border-bottom: 1px dashed #b5cde0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .step-index {
+            background: #f09b4b;
+            color: white;
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 30px;
+            font-weight: 800;
+        }
+        .step-time {
+            background: #ffe6c0;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        .step-added-by {
+            font-size: 0.7rem;
+            background: #e6d5b8;
+            padding: 2px 8px;
+            border-radius: 20px;
+            color: #5e3f1a;
+        }
+        .current-view-badge {
+            background: #d4e3fd;
+            padding: 8px 16px;
+            border-radius: 30px;
+            margin: 10px 0;
+            font-weight: 600;
+            color: #1d4a72;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login modal -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <h2 id="loginTitle">🔐 Connexion</h2>
+            <input type="text" class="login-input" id="loginUsername" placeholder="Nom d'utilisateur">
+            <input type="password" class="login-input" id="loginPassword" placeholder="Mot de passe">
+            <button class="login-btn" id="loginBtn">Se connecter</button>
+            <div class="register-link" id="showRegister">Pas de compte ? S'inscrire</div>
+        </div>
+    </div>
+
+    <!-- Register modal -->
+    <div class="login-overlay" id="registerOverlay" style="display: none;">
+        <div class="login-box">
+            <h2>📝 Inscription</h2>
+            <input type="text" class="login-input" id="regUsername" placeholder="Nom d'utilisateur">
+            <input type="password" class="login-input" id="regPassword" placeholder="Mot de passe">
+            <input type="password" class="login-input" id="regConfirm" placeholder="Confirmer mot de passe">
+            <button class="login-btn" id="registerBtn">S'inscrire</button>
+            <div class="register-link" id="showLogin">Retour à la connexion</div>
+        </div>
+    </div>
+
+    <div class="app-container" id="app" style="display: none;">
+        <!-- Language toggle -->
+        <div class="lang-row">
+            <button class="lang-btn" id="btnLangZh">🇨🇳 中文</button>
+            <button class="lang-btn active" id="btnLangFr">🇫🇷 Français</button>
+        </div>
+
+        <!-- User info bar -->
+        <div class="user-info-bar" id="userInfoBar">
+            <span id="currentUserDisplay">👤 Non connecté</span>
+            <button class="logout-btn" id="logoutBtn">Déconnexion</button>
+        </div>
+
+        <!-- Admin section -->
+        <div class="user-section" id="adminSection">
+            <div class="user-header">
+                <h3 class="zh" style="display:none;">👥 使用者管理 (管理员)</h3>
+                <h3 class="fr">👥 Gestion (Admin)</h3>
+            </div>
+            <div class="user-list" id="userList"></div>
+            <div class="add-user-form">
+                <input type="text" id="newUserName" placeholder="Nouvel utilisateur">
+                <input type="password" id="newUserPassword" placeholder="Mot de passe">
+                <button class="btn-add-user" id="addUserBtn">➕</button>
+            </div>
+        </div>
+
+        <!-- User selector -->
+        <div class="user-selector">
+            <div class="selector-label">
+                <span class="zh" style="display:none;">👁️ 查看其他使用者数据</span>
+                <span class="fr">👁️ Voir les données d'autres utilisateurs</span>
+            </div>
+            <div class="user-buttons" id="userSelectorButtons"></div>
+        </div>
+
+        <!-- Dual date selection -->
+        <div class="dual-date-section">
+            <div class="date-card">
+                <div class="label">
+                    <span>📅</span>
+                    <span class="zh" style="display:none;">录入日期</span>
+                    <span class="fr">Date d'ajout</span>
+                </div>
+                <input type="date" id="inputDate" class="date-picker-input">
+            </div>
+            <div class="date-card">
+                <div class="label">
+                    <span>👁️</span>
+                    <span class="zh" style="display:none;">查看日期</span>
+                    <span class="fr">Date à visualiser</span>
+                </div>
+                <input type="date" id="viewDate" class="date-picker-input">
+            </div>
+        </div>
+
+        <!-- Driver tabs -->
+        <div class="driver-tabs" id="driverTabs"></div>
+
+        <!-- Current view info -->
+        <div class="current-view-badge" id="currentViewHint"></div>
+
+        <!-- Input section -->
+        <div class="input-section" id="inputSection">
+            <div class="section-title">
+                <span>📝</span>
+                <span class="zh" style="display:none;">录入顾客</span>
+                <span class="fr">Ajouter un client</span>
+                <span style="margin-left:auto; font-size:0.9rem; color:#2f5575;" id="inputDateHint"></span>
+            </div>
+            <div class="input-row">
+                <div class="input-field"><span>👤</span><input type="text" id="customerName" placeholder="Nom"></div>
+                <div class="input-field"><span>📍</span><input type="text" id="customerAddr" placeholder="Adresse"></div>
+                
+                <div class="time-type-row">
+                    <div class="input-field time-type-select">
+                        <span>⏱️</span>
+                        <select id="timeType">
+                            <option value="fixed">Heure fixe</option>
+                            <option value="before">Avant</option>
+                            <option value="range">Intervalle</option>
+                            <option value="free">Libre</option>
+                        </select>
+                    </div>
+                    <div class="time-input-container" id="timeInputContainer">
+                        <div class="input-field" style="flex:1;">
+                            <span>⏰</span>
+                            <input type="time" id="fixedTime" value="10:00">
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-add" id="addCustomerBtn">
+                    <span class="zh" style="display:none;">➕ 添加顾客</span>
+                    <span class="fr">➕ Ajouter</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Customer list -->
+        <div class="list-header">
+            <h3>
+                <span class="zh" style="display:none;">📋 顾客列表</span>
+                <span class="fr">📋 Liste des clients</span>
+                <span style="margin-left:10px; font-size:0.9rem; color:#2f5575;" id="viewDateHint"></span>
+            </h3>
+            <span class="route-badge" id="customerCount">0</span>
+        </div>
+        <ul class="customer-list" id="customerList"></ul>
+
+        <!-- Route planning -->
+        <div class="action-panel">
+            <button class="optimize-btn" id="optimizeRouteBtn">
+                <span>🗺️</span>
+                <span class="zh" style="display:none;">自动规划路线</span>
+                <span class="fr">Optimiser l'itinéraire</span>
+            </button>
+
+            <div class="route-output" id="routeOutput" style="display: none;">
+                <h4 style="margin-bottom:10px; display:flex; gap:8px;">
+                    <span>🚚</span>
+                    <span class="zh" style="display:none;">建议送货顺序</span>
+                    <span class="fr">Ordre de livraison suggéré</span>
+                </h4>
+                <ul class="route-steps" id="routeStepsList"></ul>
+                <div class="small-note" id="routeNote"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // Global state
+            let currentLang = 'fr'; // Default to French
+            let currentUser = null;
+            let viewingUser = null;
+            let currentDriver = 'Edwin';
+            let inputDate = new Date().toISOString().split('T')[0];
+            let viewDate = new Date().toISOString().split('T')[0];
+            
+            // Data structure
+            let usersData = {
+                admin: {
+                    password: 'admin123',
+                    drivers: ['Edwin', 'Jismon', 'Wang'],
+                    deliveries: {
+                        'Edwin': {},
+                        'Jismon': {},
+                        'Wang': {}
+                    }
+                }
+            };
+
+            // Load from storage
+            function loadFromStorage() {
+                const saved = localStorage.getItem('multiUserDeliveryV7');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        usersData = parsed;
+                    } catch (e) {}
+                }
+                if (!usersData.admin) {
+                    usersData.admin = {
+                        password: 'admin123',
+                        drivers: ['Edwin', 'Jismon', 'Wang'],
+                        deliveries: {
+                            'Edwin': {},
+                            'Jismon': {},
+                            'Wang': {}
+                        }
+                    };
+                }
+            }
+            function saveToStorage() {
+                localStorage.setItem('multiUserDeliveryV7', JSON.stringify(usersData));
+            }
+
+            // DOM elements
+            const loginOverlay = document.getElementById('loginOverlay');
+            const registerOverlay = document.getElementById('registerOverlay');
+            const appContainer = document.getElementById('app');
+            const loginUsername = document.getElementById('loginUsername');
+            const loginPassword = document.getElementById('loginPassword');
+            const loginBtn = document.getElementById('loginBtn');
+            const showRegister = document.getElementById('showRegister');
+            const showLogin = document.getElementById('showLogin');
+            const regUsername = document.getElementById('regUsername');
+            const regPassword = document.getElementById('regPassword');
+            const regConfirm = document.getElementById('regConfirm');
+            const registerBtn = document.getElementById('registerBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const currentUserDisplay = document.getElementById('currentUserDisplay');
+            const adminSection = document.getElementById('adminSection');
+            const userSelectorButtons = document.getElementById('userSelectorButtons');
+            const inputSection = document.getElementById('inputSection');
+            
+            const userListEl = document.getElementById('userList');
+            const newUserName = document.getElementById('newUserName');
+            const newUserPassword = document.getElementById('newUserPassword');
+            const addUserBtn = document.getElementById('addUserBtn');
+            const driverTabsEl = document.getElementById('driverTabs');
+            const currentViewHint = document.getElementById('currentViewHint');
+            const inputDatePicker = document.getElementById('inputDate');
+            const viewDatePicker = document.getElementById('viewDate');
+            const inputDateHint = document.getElementById('inputDateHint');
+            const viewDateHint = document.getElementById('viewDateHint');
+            const customerListEl = document.getElementById('customerList');
+            const customerCountSpan = document.getElementById('customerCount');
+            const optimizeBtn = document.getElementById('optimizeRouteBtn');
+            const routeOutputDiv = document.getElementById('routeOutput');
+            const routeStepsList = document.getElementById('routeStepsList');
+            const routeNote = document.getElementById('routeNote');
+            
+            const nameInput = document.getElementById('customerName');
+            const addrInput = document.getElementById('customerAddr');
+            const timeType = document.getElementById('timeType');
+            const timeInputContainer = document.getElementById('timeInputContainer');
+            const addBtn = document.getElementById('addCustomerBtn');
+
+            // Language buttons
+            const btnZh = document.getElementById('btnLangZh');
+            const btnFr = document.getElementById('btnLangFr');
+            const zhSpans = document.querySelectorAll('.zh');
+            const frSpans = document.querySelectorAll('.fr');
+
+            // Set default dates
+            function setDefaultDates() {
+                const today = new Date().toISOString().split('T')[0];
+                inputDatePicker.value = today;
+                viewDatePicker.value = today;
+                inputDate = today;
+                viewDate = today;
+            }
+
+            // Render time input based on type
+            function renderTimeInput() {
+                const type = timeType.value;
+                let html = '';
+                if (type === 'fixed') {
+                    html = `<div class="input-field" style="flex:1;"><span>⏰</span><input type="time" id="fixedTime" value="10:00"></div>`;
+                } else if (type === 'before') {
+                    html = `<div class="input-field" style="flex:1;"><span>⏰</span><input type="time" id="beforeTime" value="18:00"></div><span style="color:#666;">avant</span>`;
+                } else if (type === 'range') {
+                    html = `<div class="time-range"><div class="input-field"><span>de</span><input type="time" id="rangeStart" value="09:00"></div><span> - </span><div class="input-field"><span>à</span><input type="time" id="rangeEnd" value="17:00"></div></div>`;
+                } else if (type === 'free') {
+                    html = `<span style="color:#666; padding:0 10px;">Libre</span>`;
+                }
+                timeInputContainer.innerHTML = html;
+            }
+            timeType.addEventListener('change', renderTimeInput);
+
+            // Language switch
+            function setLanguage(lang) {
+                currentLang = lang;
+                if (lang === 'zh') {
+                    zhSpans.forEach(el => el.style.display = 'inline');
+                    frSpans.forEach(el => el.style.display = 'none');
+                    btnZh.classList.add('active');
+                    btnFr.classList.remove('active');
+                } else {
+                    zhSpans.forEach(el => el.style.display = 'none');
+                    frSpans.forEach(el => el.style.display = 'inline');
+                    btnFr.classList.add('active');
+                    btnZh.classList.remove('active');
+                }
+                if (currentUser) {
+                    renderUserSelector();
+                    renderDriverTabs();
+                    renderCustomerList();
+                    updateHints();
+                }
+            }
+            btnZh.addEventListener('click', () => setLanguage('zh'));
+            btnFr.addEventListener('click', () => setLanguage('fr'));
+
+            // Update hints
+            function updateHints() {
+                inputDateHint.innerText = `${currentLang==='zh'?'录入日期':'Date d\'ajout'}: ${inputDate}`;
+                viewDateHint.innerText = `${currentLang==='zh'?'查看日期':'Date visualisée'}: ${viewDate}`;
+                const viewingName = viewingUser === currentUser ? 
+                    (currentLang==='zh'? `${currentUser} (自己的数据)` : `${currentUser} (mes données)`) : 
+                    `${viewingUser}`;
+                currentViewHint.innerText = currentLang==='zh' ?
+                    `当前使用者: ${currentUser} | 查看用户: ${viewingName} | 司机: ${currentDriver} | 录入日期: ${inputDate} | 查看日期: ${viewDate}` :
+                    `Utilisateur: ${currentUser} | Vue: ${viewingName} | Chauffeur: ${currentDriver} | Ajout: ${inputDate} | Visualisation: ${viewDate}`;
+            }
+
+            // Render user selector
+            function renderUserSelector() {
+                let html = '';
+                Object.keys(usersData).forEach(user => {
+                    if (user === 'admin') return;
+                    const activeClass = (viewingUser === user) ? 'active' : '';
+                    const ownClass = (user === currentUser) ? 'own' : '';
+                    const label = user === currentUser ? 
+                        (currentLang==='zh'? `${user} (我)` : `${user} (moi)`) : 
+                        user;
+                    html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${user}">👤 ${label}</button>`;
+                });
+                userSelectorButtons.innerHTML = html;
+
+                document.querySelectorAll('.user-button').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const user = btn.dataset.user;
+                        viewingUser = user;
+                        renderUserSelector();
+                        renderDriverTabs();
+                        renderCustomerList();
+                        updateInputSectionState();
+                        updateHints();
+                        routeOutputDiv.style.display = 'none';
+                    });
+                });
+            }
+
+            // Update input section state
+            function updateInputSectionState() {
+                if (viewingUser === currentUser) {
+                    inputSection.classList.remove('disabled');
+                } else {
+                    inputSection.classList.add('disabled');
+                }
+            }
+
+            // Login
+            function login(username, password) {
+                if (usersData[username] && usersData[username].password === password) {
+                    currentUser = username;
+                    viewingUser = username;
+                    currentUserDisplay.innerText = `👤 ${currentUser}`;
+                    loginOverlay.style.display = 'none';
+                    appContainer.style.display = 'block';
+                    
+                    if (username === 'admin') {
+                        adminSection.style.display = 'block';
+                    } else {
+                        adminSection.style.display = 'none';
+                    }
+                    
+                    if (!usersData[currentUser].drivers) {
+                        usersData[currentUser].drivers = ['Edwin', 'Jismon', 'Wang'];
+                    }
+                    if (!usersData[currentUser].deliveries) {
+                        usersData[currentUser].deliveries = {
+                            'Edwin': {},
+                            'Jismon': {},
+                            'Wang': {}
+                        };
+                    }
+                    
+                    currentDriver = usersData[currentUser].drivers[0];
+                    renderUserSelector();
+                    renderDriverTabs();
+                    renderCustomerList();
+                    updateInputSectionState();
+                    updateHints();
+                    return true;
+                }
+                return false;
+            }
+
+            // Logout
+            function logout() {
+                currentUser = null;
+                viewingUser = null;
+                appContainer.style.display = 'none';
+                loginOverlay.style.display = 'flex';
+                loginUsername.value = '';
+                loginPassword.value = '';
+            }
+
+            // Login button
+            loginBtn.addEventListener('click', () => {
+                const username = loginUsername.value.trim();
+                const password = loginPassword.value.trim();
+                if (login(username, password)) {
+                    // Success
+                } else {
+                    alert(currentLang === 'zh' ? '用户名或密码错误' : 'Nom d\'utilisateur ou mot de passe incorrect');
+                }
+            });
+
+            // Enter key
+            loginPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') loginBtn.click();
+            });
+
+            // Show register
+            showRegister.addEventListener('click', () => {
+                loginOverlay.style.display = 'none';
+                registerOverlay.style.display = 'flex';
+            });
+
+            showLogin.addEventListener('click', () => {
+                registerOverlay.style.display = 'none';
+                loginOverlay.style.display = 'flex';
+            });
+
+            // Register
+            registerBtn.addEventListener('click', () => {
+                const username = regUsername.value.trim();
+                const password = regPassword.value.trim();
+                const confirm = regConfirm.value.trim();
+                
+                if (!username || !password) {
+                    alert(currentLang === 'zh' ? '请填写用户名和密码' : 'Veuillez remplir tous les champs');
+                    return;
+                }
+                if (password !== confirm) {
+                    alert(currentLang === 'zh' ? '两次密码不一致' : 'Les mots de passe ne correspondent pas');
+                    return;
+                }
+                if (usersData[username]) {
+                    alert(currentLang === 'zh' ? '用户名已存在' : 'Nom d\'utilisateur déjà existant');
+                    return;
+                }
+                
+                usersData[username] = {
+                    password: password,
+                    drivers: ['Edwin', 'Jismon', 'Wang'],
+                    deliveries: {
+                        'Edwin': {},
+                        'Jismon': {},
+                        'Wang': {}
+                    }
+                };
+                saveToStorage();
+                
+                alert(currentLang === 'zh' ? '注册成功，请登录' : 'Inscription réussie');
+                registerOverlay.style.display = 'none';
+                loginOverlay.style.display = 'flex';
+                regUsername.value = '';
+                regPassword.value = '';
+                regConfirm.value = '';
+            });
+
+            logoutBtn.addEventListener('click', logout);
+
+            // Admin: render user list
+            function renderUserList() {
+                if (currentUser !== 'admin') return;
+                let html = '';
+                Object.keys(usersData).forEach(user => {
+                    if (user === 'admin') return;
+                    html += `
+                        <div class="user-tag">
+                            👤 ${user}
+                            <span class="remove-user" onclick="removeUser('${user}')">✕</span>
+                        </div>
+                    `;
+                });
+                userListEl.innerHTML = html;
+            }
+
+            // Admin: add user
+            addUserBtn.addEventListener('click', () => {
+                if (currentUser !== 'admin') return;
+                const username = newUserName.value.trim();
+                const password = newUserPassword.value.trim();
+                if (!username || !password) {
+                    alert('Veuillez remplir tous les champs');
+                    return;
+                }
+                if (usersData[username]) {
+                    alert('Utilisateur déjà existant');
+                    return;
+                }
+                usersData[username] = {
+                    password: password,
+                    drivers: ['Edwin', 'Jismon', 'Wang'],
+                    deliveries: {
+                        'Edwin': {},
+                        'Jismon': {},
+                        'Wang': {}
+                    }
+                };
+                saveToStorage();
+                newUserName.value = '';
+                newUserPassword.value = '';
+                renderUserList();
+                renderUserSelector();
+            });
+
+            // Admin: remove user
+            window.removeUser = function(username) {
+                if (currentUser !== 'admin') return;
+                if (confirm(`Supprimer l'utilisateur ${username} ?`)) {
+                    delete usersData[username];
+                    saveToStorage();
+                    renderUserList();
+                    renderUserSelector();
+                    if (viewingUser === username) {
+                        viewingUser = currentUser;
+                        renderUserSelector();
+                        renderCustomerList();
+                        updateInputSectionState();
+                    }
+                }
+            };
+
+            // Render driver tabs
+            function renderDriverTabs() {
+                if (!viewingUser) return;
+                const userData = usersData[viewingUser];
+                let html = '';
+                userData.drivers.forEach(driver => {
+                    const activeClass = (currentDriver === driver) ? 'active' : '';
+                    html += `<button class="driver-tab ${activeClass}" data-driver="${driver}">👤 ${driver}</button>`;
+                });
+                driverTabsEl.innerHTML = html;
+
+                document.querySelectorAll('.driver-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        currentDriver = tab.dataset.driver;
+                        renderDriverTabs();
+                        renderCustomerList();
+                        updateHints();
+                        routeOutputDiv.style.display = 'none';
+                    });
+                });
+            }
+
+            // Date changes
+            inputDatePicker.addEventListener('change', (e) => {
+                inputDate = e.target.value;
+                updateHints();
+            });
+
+            viewDatePicker.addEventListener('change', (e) => {
+                viewDate = e.target.value;
+                renderCustomerList();
+                routeOutputDiv.style.display = 'none';
+                updateHints();
+            });
+
+            // Get deliveries by user, driver, date
+            function getDeliveriesByDate(user, driver, date) {
+                if (!usersData[user] || !usersData[user].deliveries[driver]) return [];
+                const dayData = usersData[user].deliveries[driver][date];
+                return dayData ? dayData.customers : [];
+            }
+
+            // Save deliveries for current user
+            function saveDeliveriesForDate(driver, date, customers) {
+                if (!usersData[currentUser].deliveries[driver]) {
+                    usersData[currentUser].deliveries[driver] = {};
+                }
+                if (!usersData[currentUser].deliveries[driver][date]) {
+                    usersData[currentUser].deliveries[driver][date] = { customers: [] };
+                }
+                usersData[currentUser].deliveries[driver][date].customers = customers;
+                saveToStorage();
+            }
+
+            // Get view date deliveries
+            function getViewDateDeliveries() {
+                return getDeliveriesByDate(viewingUser, currentDriver, viewDate);
+            }
+
+            // Get input date deliveries
+            function getInputDateDeliveries() {
+                return getDeliveriesByDate(currentUser, currentDriver, inputDate);
+            }
+
+            // Get time value
+            function getTimeValue() {
+                const type = timeType.value;
+                if (type === 'fixed') {
+                    const fixed = document.getElementById('fixedTime');
+                    return { type: 'fixed', value: fixed ? fixed.value : '10:00' };
+                } else if (type === 'before') {
+                    const before = document.getElementById('beforeTime');
+                    return { type: 'before', value: before ? before.value : '18:00' };
+                } else if (type === 'range') {
+                    const start = document.getElementById('rangeStart');
+                    const end = document.getElementById('rangeEnd');
+                    return { type: 'range', value: { start: start ? start.value : '09:00', end: end ? end.value : '17:00' } };
+                } else {
+                    return { type: 'free', value: null };
+                }
+            }
+
+            // Format time requirement
+            function formatTimeRequirement(customer) {
+                const t = customer.timeReq;
+                if (!t) return '';
+                if (t.type === 'fixed') return `⏰ ${t.value}`;
+                if (t.type === 'before') return `⏰ avant ${t.value}`;
+                if (t.type === 'range') return `⏰ ${t.value.start} - ${t.value.end}`;
+                return '⏰ Libre';
+            }
+
+            // Format added time
+            function formatAddedTime(timestamp) {
+                if (!timestamp) return '';
+                const date = new Date(timestamp);
+                return date.toLocaleString([], { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+            }
+
+            // Add customer
+            function addCustomer() {
+                if (viewingUser !== currentUser) {
+                    alert(currentLang === 'zh' ? '只能在自己的数据中添加顾客' : 'Vous ne pouvez ajouter que dans vos propres données');
+                    return;
+                }
+
+                const name = nameInput.value.trim();
+                const addr = addrInput.value.trim();
+                if (!name || !addr) {
+                    alert(currentLang === 'zh' ? '请填写姓名和地址' : 'Veuillez remplir le nom et l\'adresse');
+                    return;
+                }
+
+                const timeReq = getTimeValue();
+                const now = Date.now();
+                const newCustomer = {
+                    id: now + '-' + Math.random().toString(36).substring(2, 8),
+                    name: name,
+                    address: addr,
+                    timeReq: timeReq,
+                    addedTime: now,
+                    addedBy: currentUser,
+                    departed: false,
+                    departureTime: null,
+                    departedBy: null
+                };
+
+                const customers = getInputDateDeliveries();
+                customers.push(newCustomer);
+                saveDeliveriesForDate(currentDriver, inputDate, customers);
+
+                nameInput.value = '';
+                addrInput.value = '';
+                nameInput.focus();
+
+                if (viewDate === inputDate && viewingUser === currentUser) {
+                    renderCustomerList();
+                }
+                routeOutputDiv.style.display = 'none';
+            }
+            addBtn.addEventListener('click', addCustomer);
+
+            // Delete customer
+            function deleteCustomer(custId) {
+                if (viewingUser !== currentUser) {
+                    alert(currentLang === 'zh' ? '不能删除其他用户的数据' : 'Vous ne pouvez pas supprimer les données d\'autres utilisateurs');
+                    return;
+                }
+
+                const customers = getViewDateDeliveries();
+                const customer = customers.find(c => c.id === custId);
+                if (customer && customer.departed) {
+                    alert(currentLang === 'zh' ? '已出发的顾客不能删除' : 'Client déjà parti, suppression impossible');
+                    return;
+                }
+                const newCustomers = customers.filter(c => c.id !== custId);
+                saveDeliveriesForDate(currentDriver, viewDate, newCustomers);
+                routeOutputDiv.style.display = 'none';
+                renderCustomerList();
+            }
+
+            // Mark customer departed - FIXED: Now ANY user can mark ANY customer as departed
+            function markCustomerDeparted(custId) {
+                // Get the current view data
+                const customers = getViewDateDeliveries();
+                const customer = customers.find(c => c.id === custId);
+                
+                if (customer && !customer.departed) {
+                    customer.departed = true;
+                    customer.departureTime = Date.now();
+                    customer.departedBy = currentUser; // Record who marked as departed
+                    
+                    // Save back to the ORIGINAL user's data (viewingUser)
+                    if (!usersData[viewingUser].deliveries[currentDriver]) {
+                        usersData[viewingUser].deliveries[currentDriver] = {};
+                    }
+                    if (!usersData[viewingUser].deliveries[currentDriver][viewDate]) {
+                        usersData[viewingUser].deliveries[currentDriver][viewDate] = { customers: [] };
+                    }
+                    usersData[viewingUser].deliveries[currentDriver][viewDate].customers = customers;
+                    saveToStorage();
+                    
+                    renderCustomerList();
+                }
+            }
+
+            // Render customer list
+            function renderCustomerList() {
+                const customers = getViewDateDeliveries();
+                const sorted = [...customers].sort((a,b) => b.addedTime - a.addedTime);
+                const isOwnData = (viewingUser === currentUser);
+
+                let html = '';
+                if (sorted.length === 0) {
+                    html = `<li style="padding:30px; text-align:center; color:#8899bb;">${currentLang==='zh'?'暂无顾客，请添加':'Aucun client'}</li>`;
+                } else {
+                    sorted.forEach(c => {
+                        const timeDisplay = formatTimeRequirement(c);
+                        const addedDisplay = formatAddedTime(c.addedTime);
+                        const departedClass = c.departed ? 'departed' : '';
+                        const otherUserClass = (c.addedBy !== viewingUser) ? 'other-user' : '';
+                        const departedInfo = c.departed ? 
+                            `<div class="departure-time">🚚 ${currentLang==='zh'?'出发时间':'Départ'}: ${new Date(c.departureTime).toLocaleTimeString()}</div>` : '';
+                        const validatedInfo = c.departed && c.departedBy ? 
+                            `<span class="validated-by">✅ ${currentLang==='zh'?'验证者':'Validé par'}: ${c.departedBy}</span>` : '';
+                        
+                        // FIXED: Depart button is ALWAYS visible for all users, but delete is only for own data
+                        const showDepart = true; // Everyone can mark as departed
+                        const showDelete = isOwnData; // Only own data can be deleted
+                        
+                        html += `
+                            <li class="customer-item ${departedClass} ${otherUserClass}">
+                                <div class="customer-info">
+                                    <div class="info-main">
+                                        <div class="name">${escapeHtml(c.name)}</div>
+                                        <div class="addr">📍 ${escapeHtml(c.address)}</div>
+                                        <div class="meta-row">
+                                            <span class="time-badge">${timeDisplay}</span>
+                                            <span class="added-time">📌 ${currentLang==='zh'?'添加':'Ajout'}: ${addedDisplay}</span>
+                                            <span class="added-by">👤 ${currentLang==='zh'?'添加者':'Ajouté par'}: ${escapeHtml(c.addedBy || 'unknown')}</span>
+                                            ${validatedInfo}
+                                        </div>
+                                        ${departedInfo}
+                                    </div>
+                                </div>
+                                <div class="item-actions">
+                                    <button class="btn-depart-customer ${!showDepart ? 'hidden' : ''}" ${c.departed ? 'disabled' : ''} data-id="${c.id}">
+                                        ${currentLang==='zh'?'🚚 出发':'🚚 Partir'}
+                                    </button>
+                                    <button class="btn-delete ${!showDelete ? 'hidden' : ''}" ${c.departed ? 'disabled' : ''} data-id="${c.id}">
+                                        ${currentLang==='zh'?'🗑️ 删除':'🗑️ Supprimer'}
+                                    </button>
+                                    ${!showDepart && !showDelete ? `<span class="readonly-badge">🔒 ${currentLang==='zh'?'只读':'Lecture seule'}</span>` : ''}
+                                </div>
+                            </li>
+                        `;
+                    });
+                }
+                customerListEl.innerHTML = html;
+                customerCountSpan.innerText = customers.length;
+
+                // FIXED: Depart button works for all users
+                document.querySelectorAll('.btn-depart-customer').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const id = btn.getAttribute('data-id');
+                        markCustomerDeparted(id);
+                    });
+                });
+                
+                // Delete only for own data
+                if (isOwnData) {
+                    document.querySelectorAll('.btn-delete').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const id = btn.getAttribute('data-id');
+                            deleteCustomer(id);
+                        });
+                    });
+                }
+            }
+
+            function escapeHtml(unsafe) {
+                return unsafe.replace(/[&<>"]/g, function(m) {
+                    if(m === '&') return '&amp;'; if(m === '<') return '&lt;'; if(m === '>') return '&gt;'; if(m === '"') return '&quot;';
+                    return m;
+                });
+            }
+
+            // Optimize route
+            function optimizeRoute() {
+                const customers = getViewDateDeliveries().filter(c => !c.departed);
+                if (customers.length === 0) {
+                    alert(currentLang === 'zh' ? '没有待出发的顾客' : 'Aucun client en attente');
+                    return;
+                }
+
+                const withTime = customers.filter(c => c.timeReq.type !== 'free');
+                const freeOnes = customers.filter(c => c.timeReq.type === 'free');
+
+                const sortedWithTime = [...withTime].sort((a,b) => {
+                    const getTimeValue = (c) => {
+                        if (c.timeReq.type === 'fixed') return c.timeReq.value;
+                        if (c.timeReq.type === 'before') return c.timeReq.value;
+                        if (c.timeReq.type === 'range') return c.timeReq.value.start;
+                        return '23:59';
+                    };
+                    return getTimeValue(a).localeCompare(getTimeValue(b));
+                });
+
+                const groups = [];
+                if (sortedWithTime.length > 0) {
+                    let tempGroup = [sortedWithTime[0]];
+                    for (let i = 1; i < sortedWithTime.length; i++) {
+                        const prevTime = getComparableTime(sortedWithTime[i-1].timeReq);
+                        const currTime = getComparableTime(sortedWithTime[i].timeReq);
+                        const diff = timeToMinutes(currTime) - timeToMinutes(prevTime);
+                        if (diff < 30) {
+                            tempGroup.push(sortedWithTime[i]);
+                        } else {
+                            groups.push([...tempGroup]);
+                            tempGroup = [sortedWithTime[i]];
+                        }
+                    }
+                    groups.push(tempGroup);
+                }
+
+                groups.forEach(g => {
+                    g.sort((x,y) => (x.address.length % 5) - (y.address.length % 5));
+                });
+
+                const optimized = [...groups.flat(), ...freeOnes];
+                displayRoute(optimized);
+                routeOutputDiv.style.display = 'block';
+            }
+
+            function getComparableTime(timeReq) {
+                if (timeReq.type === 'fixed') return timeReq.value;
+                if (timeReq.type === 'before') return timeReq.value;
+                if (timeReq.type === 'range') return timeReq.value.start;
+                return '23:59';
+            }
+
+            function timeToMinutes(timeStr) {
+                if (!timeStr) return 0;
+                const [h, m] = timeStr.split(':').map(Number);
+                return h * 60 + m;
+            }
+
+            function displayRoute(optimizedCustomers) {
+                let stepsHtml = '';
+                optimizedCustomers.forEach((c, idx) => {
+                    const timeDisplay = formatTimeRequirement(c);
+                    const departedMark = c.departed ? 
+                        (currentLang==='zh'?' (已出发)' : ' (parti)') : '';
+                    stepsHtml += `
+                        <li>
+                            <span class="step-index">${idx+1}</span>
+                            <strong>${escapeHtml(c.name)}${departedMark}</strong> 
+                            <span style="color:#3f617f; font-size:0.85rem;">${escapeHtml(c.address)}</span>
+                            <span class="step-time">${timeDisplay}</span>
+                            <span class="step-added-by">👤 ${escapeHtml(c.addedBy || 'unknown')}</span>
+                            ${c.departed && c.departedBy ? `<span class="step-added-by" style="background:#c8e6c9;">✅ ${c.departedBy}</span>` : ''}
+                        </li>
+                    `;
+                });
+                routeStepsList.innerHTML = stepsHtml;
+                routeNote.innerText = currentLang==='zh'? 
+                    '* 按时间要求及邻近优化，自由安排顾客排在最后' : 
+                    '* Optimisé selon les horaires et la proximité, clients libres à la fin';
+            }
+
+            optimizeBtn.addEventListener('click', optimizeRoute);
+
+            // Initialize
+            loadFromStorage();
+            setDefaultDates();
+            renderTimeInput();
+            
+            // Default show login
+            loginOverlay.style.display = 'flex';
+            appContainer.style.display = 'none';
+            setLanguage('fr'); // Set French as default
+        })();
+    </script>
+</body>
+</html>
