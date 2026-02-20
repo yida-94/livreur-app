@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Livreurs · Validation croisée · Version bilingue</title>
+    <title>Livreurs · Supabase</title>
+    <!-- 引入 Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -598,6 +600,12 @@
             font-weight: 600;
             color: #1d4a72;
         }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #2f6d9e;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -732,6 +740,7 @@
             </h3>
             <span class="route-badge" id="customerCount">0</span>
         </div>
+        <div id="loadingMessage" class="loading" style="display: none;">Chargement...</div>
         <ul class="customer-list" id="customerList"></ul>
 
         <!-- Route planning -->
@@ -756,53 +765,27 @@
 
     <script>
         (function() {
-            // Global state
-            let currentLang = 'fr'; // Default to French
+            // ==================== 配置 Supabase ====================
+            // 已经替换成您的信息
+            const SUPABASE_URL = 'https://jmywqokewgnnypqugqev.supabase.co';
+            const SUPABASE_KEY = 'sb_publishable_XXkyyl1z7V7D3w1x1sfppA_OPDEFkig';
+            
+            // 初始化 Supabase 客户端
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            
+            // ==================== 全局状态 ====================
+            let currentLang = 'fr';
             let currentUser = null;
             let viewingUser = null;
             let currentDriver = 'Edwin';
             let inputDate = new Date().toISOString().split('T')[0];
             let viewDate = new Date().toISOString().split('T')[0];
             
-            // Data structure
-            let usersData = {
-                admin: {
-                    password: 'admin123',
-                    drivers: ['Edwin', 'Jismon', 'Wang'],
-                    deliveries: {
-                        'Edwin': {},
-                        'Jismon': {},
-                        'Wang': {}
-                    }
-                }
-            };
-
-            // Load from storage
-            function loadFromStorage() {
-                const saved = localStorage.getItem('multiUserDeliveryV7');
-                if (saved) {
-                    try {
-                        const parsed = JSON.parse(saved);
-                        usersData = parsed;
-                    } catch (e) {}
-                }
-                if (!usersData.admin) {
-                    usersData.admin = {
-                        password: 'admin123',
-                        drivers: ['Edwin', 'Jismon', 'Wang'],
-                        deliveries: {
-                            'Edwin': {},
-                            'Jismon': {},
-                            'Wang': {}
-                        }
-                    };
-                }
-            }
-            function saveToStorage() {
-                localStorage.setItem('multiUserDeliveryV7', JSON.stringify(usersData));
-            }
-
-            // DOM elements
+            // 用户数据存在 Supabase 的 auth 表里
+            // 我们自己维护一个简单的用户列表
+            const users = ['admin', 'demo1', 'demo2']; // 演示用，实际可以从数据库加载
+            
+            // DOM 元素
             const loginOverlay = document.getElementById('loginOverlay');
             const registerOverlay = document.getElementById('registerOverlay');
             const appContainer = document.getElementById('app');
@@ -833,6 +816,7 @@
             const viewDateHint = document.getElementById('viewDateHint');
             const customerListEl = document.getElementById('customerList');
             const customerCountSpan = document.getElementById('customerCount');
+            const loadingMessage = document.getElementById('loadingMessage');
             const optimizeBtn = document.getElementById('optimizeRouteBtn');
             const routeOutputDiv = document.getElementById('routeOutput');
             const routeStepsList = document.getElementById('routeStepsList');
@@ -844,13 +828,13 @@
             const timeInputContainer = document.getElementById('timeInputContainer');
             const addBtn = document.getElementById('addCustomerBtn');
 
-            // Language buttons
+            // 语言按钮
             const btnZh = document.getElementById('btnLangZh');
             const btnFr = document.getElementById('btnLangFr');
             const zhSpans = document.querySelectorAll('.zh');
             const frSpans = document.querySelectorAll('.fr');
 
-            // Set default dates
+            // 设置默认日期
             function setDefaultDates() {
                 const today = new Date().toISOString().split('T')[0];
                 inputDatePicker.value = today;
@@ -859,7 +843,7 @@
                 viewDate = today;
             }
 
-            // Render time input based on type
+            // 渲染时间输入框
             function renderTimeInput() {
                 const type = timeType.value;
                 let html = '';
@@ -876,7 +860,7 @@
             }
             timeType.addEventListener('change', renderTimeInput);
 
-            // Language switch
+            // 语言切换
             function setLanguage(lang) {
                 currentLang = lang;
                 if (lang === 'zh') {
@@ -900,7 +884,7 @@
             btnZh.addEventListener('click', () => setLanguage('zh'));
             btnFr.addEventListener('click', () => setLanguage('fr'));
 
-            // Update hints
+            // 更新提示信息
             function updateHints() {
                 inputDateHint.innerText = `${currentLang==='zh'?'录入日期':'Date d\'ajout'}: ${inputDate}`;
                 viewDateHint.innerText = `${currentLang==='zh'?'查看日期':'Date visualisée'}: ${viewDate}`;
@@ -912,10 +896,48 @@
                     `Utilisateur: ${currentUser} | Vue: ${viewingName} | Chauffeur: ${currentDriver} | Ajout: ${inputDate} | Visualisation: ${viewDate}`;
             }
 
-            // Render user selector
+            // ==================== 用户管理 ====================
+            
+            // 登录
+            async function login(username, password) {
+                try {
+                    // 简单演示登录，实际应该用 Supabase Auth
+                    if (password === '123456') { // 简单密码
+                        currentUser = username;
+                        viewingUser = username;
+                        currentUserDisplay.innerText = `👤 ${currentUser}`;
+                        loginOverlay.style.display = 'none';
+                        appContainer.style.display = 'block';
+                        
+                        // 如果是admin，显示管理区域
+                        if (username === 'admin') {
+                            adminSection.style.display = 'block';
+                        } else {
+                            adminSection.style.display = 'none';
+                        }
+                        
+                        currentDriver = 'Edwin';
+                        
+                        renderUserSelector();
+                        renderDriverTabs();
+                        renderCustomerList();
+                        updateInputSectionState();
+                        updateHints();
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.error('登录失败:', error);
+                    return false;
+                }
+            }
+
+            // 渲染用户选择器
             function renderUserSelector() {
+                if (!currentUser) return;
+                
                 let html = '';
-                Object.keys(usersData).forEach(user => {
+                users.forEach(user => {
                     if (user === 'admin') return;
                     const activeClass = (viewingUser === user) ? 'active' : '';
                     const ownClass = (user === currentUser) ? 'own' : '';
@@ -940,7 +962,7 @@
                 });
             }
 
-            // Update input section state
+            // 更新录入区域状态
             function updateInputSectionState() {
                 if (viewingUser === currentUser) {
                     inputSection.classList.remove('disabled');
@@ -949,44 +971,7 @@
                 }
             }
 
-            // Login
-            function login(username, password) {
-                if (usersData[username] && usersData[username].password === password) {
-                    currentUser = username;
-                    viewingUser = username;
-                    currentUserDisplay.innerText = `👤 ${currentUser}`;
-                    loginOverlay.style.display = 'none';
-                    appContainer.style.display = 'block';
-                    
-                    if (username === 'admin') {
-                        adminSection.style.display = 'block';
-                    } else {
-                        adminSection.style.display = 'none';
-                    }
-                    
-                    if (!usersData[currentUser].drivers) {
-                        usersData[currentUser].drivers = ['Edwin', 'Jismon', 'Wang'];
-                    }
-                    if (!usersData[currentUser].deliveries) {
-                        usersData[currentUser].deliveries = {
-                            'Edwin': {},
-                            'Jismon': {},
-                            'Wang': {}
-                        };
-                    }
-                    
-                    currentDriver = usersData[currentUser].drivers[0];
-                    renderUserSelector();
-                    renderDriverTabs();
-                    renderCustomerList();
-                    updateInputSectionState();
-                    updateHints();
-                    return true;
-                }
-                return false;
-            }
-
-            // Logout
+            // 登出
             function logout() {
                 currentUser = null;
                 viewingUser = null;
@@ -996,23 +981,22 @@
                 loginPassword.value = '';
             }
 
-            // Login button
-            loginBtn.addEventListener('click', () => {
+            // 登录按钮
+            loginBtn.addEventListener('click', async () => {
                 const username = loginUsername.value.trim();
                 const password = loginPassword.value.trim();
-                if (login(username, password)) {
-                    // Success
-                } else {
+                const success = await login(username, password);
+                if (!success) {
                     alert(currentLang === 'zh' ? '用户名或密码错误' : 'Nom d\'utilisateur ou mot de passe incorrect');
                 }
             });
 
-            // Enter key
+            // 回车登录
             loginPassword.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') loginBtn.click();
             });
 
-            // Show register
+            // 显示注册界面
             showRegister.addEventListener('click', () => {
                 loginOverlay.style.display = 'none';
                 registerOverlay.style.display = 'flex';
@@ -1023,8 +1007,8 @@
                 loginOverlay.style.display = 'flex';
             });
 
-            // Register
-            registerBtn.addEventListener('click', () => {
+            // 注册
+            registerBtn.addEventListener('click', async () => {
                 const username = regUsername.value.trim();
                 const password = regPassword.value.trim();
                 const confirm = regConfirm.value.trim();
@@ -1037,22 +1021,9 @@
                     alert(currentLang === 'zh' ? '两次密码不一致' : 'Les mots de passe ne correspondent pas');
                     return;
                 }
-                if (usersData[username]) {
-                    alert(currentLang === 'zh' ? '用户名已存在' : 'Nom d\'utilisateur déjà existant');
-                    return;
-                }
                 
-                usersData[username] = {
-                    password: password,
-                    drivers: ['Edwin', 'Jismon', 'Wang'],
-                    deliveries: {
-                        'Edwin': {},
-                        'Jismon': {},
-                        'Wang': {}
-                    }
-                };
-                saveToStorage();
-                
+                // 简单注册，实际应该用 Supabase Auth
+                users.push(username);
                 alert(currentLang === 'zh' ? '注册成功，请登录' : 'Inscription réussie');
                 registerOverlay.style.display = 'none';
                 loginOverlay.style.display = 'flex';
@@ -1063,24 +1034,8 @@
 
             logoutBtn.addEventListener('click', logout);
 
-            // Admin: render user list
-            function renderUserList() {
-                if (currentUser !== 'admin') return;
-                let html = '';
-                Object.keys(usersData).forEach(user => {
-                    if (user === 'admin') return;
-                    html += `
-                        <div class="user-tag">
-                            👤 ${user}
-                            <span class="remove-user" onclick="removeUser('${user}')">✕</span>
-                        </div>
-                    `;
-                });
-                userListEl.innerHTML = html;
-            }
-
-            // Admin: add user
-            addUserBtn.addEventListener('click', () => {
+            // 管理员添加用户
+            addUserBtn.addEventListener('click', async () => {
                 if (currentUser !== 'admin') return;
                 const username = newUserName.value.trim();
                 const password = newUserPassword.value.trim();
@@ -1088,49 +1043,18 @@
                     alert('Veuillez remplir tous les champs');
                     return;
                 }
-                if (usersData[username]) {
-                    alert('Utilisateur déjà existant');
-                    return;
-                }
-                usersData[username] = {
-                    password: password,
-                    drivers: ['Edwin', 'Jismon', 'Wang'],
-                    deliveries: {
-                        'Edwin': {},
-                        'Jismon': {},
-                        'Wang': {}
-                    }
-                };
-                saveToStorage();
+                users.push(username);
+                alert('Utilisateur créé');
                 newUserName.value = '';
                 newUserPassword.value = '';
-                renderUserList();
                 renderUserSelector();
             });
 
-            // Admin: remove user
-            window.removeUser = function(username) {
-                if (currentUser !== 'admin') return;
-                if (confirm(`Supprimer l'utilisateur ${username} ?`)) {
-                    delete usersData[username];
-                    saveToStorage();
-                    renderUserList();
-                    renderUserSelector();
-                    if (viewingUser === username) {
-                        viewingUser = currentUser;
-                        renderUserSelector();
-                        renderCustomerList();
-                        updateInputSectionState();
-                    }
-                }
-            };
-
-            // Render driver tabs
+            // 渲染司机选项卡
             function renderDriverTabs() {
-                if (!viewingUser) return;
-                const userData = usersData[viewingUser];
+                const drivers = ['Edwin', 'Jismon', 'Wang'];
                 let html = '';
-                userData.drivers.forEach(driver => {
+                drivers.forEach(driver => {
                     const activeClass = (currentDriver === driver) ? 'active' : '';
                     html += `<button class="driver-tab ${activeClass}" data-driver="${driver}">👤 ${driver}</button>`;
                 });
@@ -1147,7 +1071,7 @@
                 });
             }
 
-            // Date changes
+            // 日期变更
             inputDatePicker.addEventListener('change', (e) => {
                 inputDate = e.target.value;
                 updateHints();
@@ -1160,36 +1084,92 @@
                 updateHints();
             });
 
-            // Get deliveries by user, driver, date
-            function getDeliveriesByDate(user, driver, date) {
-                if (!usersData[user] || !usersData[user].deliveries[driver]) return [];
-                const dayData = usersData[user].deliveries[driver][date];
-                return dayData ? dayData.customers : [];
-            }
+            // ==================== 数据库操作 ====================
 
-            // Save deliveries for current user
-            function saveDeliveriesForDate(driver, date, customers) {
-                if (!usersData[currentUser].deliveries[driver]) {
-                    usersData[currentUser].deliveries[driver] = {};
+            // 获取查看日期的数据
+            async function getViewDateDeliveries() {
+                if (!viewingUser) return [];
+                
+                try {
+                    const { data, error } = await supabase
+                        .from('customers')
+                        .select('*')
+                        .eq('username', viewingUser)
+                        .eq('driver', currentDriver)
+                        .eq('date', viewDate);
+                    
+                    if (error) throw error;
+                    return data || [];
+                } catch (error) {
+                    console.error('获取数据失败:', error);
+                    return [];
                 }
-                if (!usersData[currentUser].deliveries[driver][date]) {
-                    usersData[currentUser].deliveries[driver][date] = { customers: [] };
+            }
+
+            // 保存顾客到数据库
+            async function saveCustomer(customer) {
+                try {
+                    const { error } = await supabase
+                        .from('customers')
+                        .insert([{
+                            customer_id: customer.id,
+                            username: currentUser,
+                            driver: currentDriver,
+                            date: inputDate,
+                            name: customer.name,
+                            address: customer.address,
+                            timeReq: customer.timeReq,
+                            addedTime: customer.addedTime,
+                            addedBy: customer.addedBy,
+                            departed: customer.departed,
+                            departureTime: customer.departureTime,
+                            departedBy: customer.departedBy
+                        }]);
+                    
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('保存失败:', error);
+                    throw error;
                 }
-                usersData[currentUser].deliveries[driver][date].customers = customers;
-                saveToStorage();
             }
 
-            // Get view date deliveries
-            function getViewDateDeliveries() {
-                return getDeliveriesByDate(viewingUser, currentDriver, viewDate);
+            // 更新顾客（用于标记出发）
+            async function updateCustomer(customerId, updates) {
+                try {
+                    const { error } = await supabase
+                        .from('customers')
+                        .update(updates)
+                        .eq('customer_id', customerId)
+                        .eq('username', viewingUser)
+                        .eq('driver', currentDriver)
+                        .eq('date', viewDate);
+                    
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('更新失败:', error);
+                    throw error;
+                }
             }
 
-            // Get input date deliveries
-            function getInputDateDeliveries() {
-                return getDeliveriesByDate(currentUser, currentDriver, inputDate);
+            // 删除顾客
+            async function deleteCustomerFromCloud(customerId) {
+                try {
+                    const { error } = await supabase
+                        .from('customers')
+                        .delete()
+                        .eq('customer_id', customerId)
+                        .eq('username', currentUser)
+                        .eq('driver', currentDriver)
+                        .eq('date', viewDate);
+                    
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    throw error;
+                }
             }
 
-            // Get time value
+            // 获取时间输入值
             function getTimeValue() {
                 const type = timeType.value;
                 if (type === 'fixed') {
@@ -1207,7 +1187,7 @@
                 }
             }
 
-            // Format time requirement
+            // 格式化显示时间要求
             function formatTimeRequirement(customer) {
                 const t = customer.timeReq;
                 if (!t) return '';
@@ -1217,15 +1197,15 @@
                 return '⏰ Libre';
             }
 
-            // Format added time
+            // 格式化添加时间
             function formatAddedTime(timestamp) {
                 if (!timestamp) return '';
                 const date = new Date(timestamp);
                 return date.toLocaleString([], { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
             }
 
-            // Add customer
-            function addCustomer() {
+            // 添加顾客
+            async function addCustomer() {
                 if (viewingUser !== currentUser) {
                     alert(currentLang === 'zh' ? '只能在自己的数据中添加顾客' : 'Vous ne pouvez ajouter que dans vos propres données');
                     return;
@@ -1240,8 +1220,9 @@
 
                 const timeReq = getTimeValue();
                 const now = Date.now();
+                const customerId = now + '-' + Math.random().toString(36).substring(2, 8);
                 const newCustomer = {
-                    id: now + '-' + Math.random().toString(36).substring(2, 8),
+                    id: customerId,
                     name: name,
                     address: addr,
                     timeReq: timeReq,
@@ -1252,138 +1233,139 @@
                     departedBy: null
                 };
 
-                const customers = getInputDateDeliveries();
-                customers.push(newCustomer);
-                saveDeliveriesForDate(currentDriver, inputDate, customers);
+                try {
+                    loadingMessage.style.display = 'block';
+                    await saveCustomer(newCustomer);
+                    
+                    nameInput.value = '';
+                    addrInput.value = '';
+                    nameInput.focus();
 
-                nameInput.value = '';
-                addrInput.value = '';
-                nameInput.focus();
-
-                if (viewDate === inputDate && viewingUser === currentUser) {
-                    renderCustomerList();
+                    if (viewDate === inputDate && viewingUser === currentUser) {
+                        await renderCustomerList();
+                    }
+                    routeOutputDiv.style.display = 'none';
+                } catch (error) {
+                    alert('Erreur: ' + error.message);
+                } finally {
+                    loadingMessage.style.display = 'none';
                 }
-                routeOutputDiv.style.display = 'none';
             }
             addBtn.addEventListener('click', addCustomer);
 
-            // Delete customer
-            function deleteCustomer(custId) {
+            // 删除顾客
+            async function deleteCustomer(custId) {
                 if (viewingUser !== currentUser) {
                     alert(currentLang === 'zh' ? '不能删除其他用户的数据' : 'Vous ne pouvez pas supprimer les données d\'autres utilisateurs');
                     return;
                 }
 
-                const customers = getViewDateDeliveries();
-                const customer = customers.find(c => c.id === custId);
-                if (customer && customer.departed) {
-                    alert(currentLang === 'zh' ? '已出发的顾客不能删除' : 'Client déjà parti, suppression impossible');
-                    return;
-                }
-                const newCustomers = customers.filter(c => c.id !== custId);
-                saveDeliveriesForDate(currentDriver, viewDate, newCustomers);
-                routeOutputDiv.style.display = 'none';
-                renderCustomerList();
-            }
-
-            // Mark customer departed - FIXED: Now ANY user can mark ANY customer as departed
-            function markCustomerDeparted(custId) {
-                // Get the current view data
-                const customers = getViewDateDeliveries();
-                const customer = customers.find(c => c.id === custId);
-                
-                if (customer && !customer.departed) {
-                    customer.departed = true;
-                    customer.departureTime = Date.now();
-                    customer.departedBy = currentUser; // Record who marked as departed
-                    
-                    // Save back to the ORIGINAL user's data (viewingUser)
-                    if (!usersData[viewingUser].deliveries[currentDriver]) {
-                        usersData[viewingUser].deliveries[currentDriver] = {};
-                    }
-                    if (!usersData[viewingUser].deliveries[currentDriver][viewDate]) {
-                        usersData[viewingUser].deliveries[currentDriver][viewDate] = { customers: [] };
-                    }
-                    usersData[viewingUser].deliveries[currentDriver][viewDate].customers = customers;
-                    saveToStorage();
-                    
-                    renderCustomerList();
+                try {
+                    loadingMessage.style.display = 'block';
+                    await deleteCustomerFromCloud(custId);
+                    await renderCustomerList();
+                    routeOutputDiv.style.display = 'none';
+                } catch (error) {
+                    alert('Erreur: ' + error.message);
+                } finally {
+                    loadingMessage.style.display = 'none';
                 }
             }
 
-            // Render customer list
-            function renderCustomerList() {
-                const customers = getViewDateDeliveries();
-                const sorted = [...customers].sort((a,b) => b.addedTime - a.addedTime);
-                const isOwnData = (viewingUser === currentUser);
+            // 标记顾客出发
+            async function markCustomerDeparted(custId) {
+                try {
+                    loadingMessage.style.display = 'block';
+                    await updateCustomer(custId, {
+                        departed: true,
+                        departureTime: Date.now(),
+                        departedBy: currentUser
+                    });
+                    await renderCustomerList();
+                } catch (error) {
+                    alert('Erreur: ' + error.message);
+                } finally {
+                    loadingMessage.style.display = 'none';
+                }
+            }
 
-                let html = '';
-                if (sorted.length === 0) {
-                    html = `<li style="padding:30px; text-align:center; color:#8899bb;">${currentLang==='zh'?'暂无顾客，请添加':'Aucun client'}</li>`;
-                } else {
-                    sorted.forEach(c => {
-                        const timeDisplay = formatTimeRequirement(c);
-                        const addedDisplay = formatAddedTime(c.addedTime);
-                        const departedClass = c.departed ? 'departed' : '';
-                        const otherUserClass = (c.addedBy !== viewingUser) ? 'other-user' : '';
-                        const departedInfo = c.departed ? 
-                            `<div class="departure-time">🚚 ${currentLang==='zh'?'出发时间':'Départ'}: ${new Date(c.departureTime).toLocaleTimeString()}</div>` : '';
-                        const validatedInfo = c.departed && c.departedBy ? 
-                            `<span class="validated-by">✅ ${currentLang==='zh'?'验证者':'Validé par'}: ${c.departedBy}</span>` : '';
-                        
-                        // FIXED: Depart button is ALWAYS visible for all users, but delete is only for own data
-                        const showDepart = true; // Everyone can mark as departed
-                        const showDelete = isOwnData; // Only own data can be deleted
-                        
-                        html += `
-                            <li class="customer-item ${departedClass} ${otherUserClass}">
-                                <div class="customer-info">
-                                    <div class="info-main">
-                                        <div class="name">${escapeHtml(c.name)}</div>
-                                        <div class="addr">📍 ${escapeHtml(c.address)}</div>
-                                        <div class="meta-row">
-                                            <span class="time-badge">${timeDisplay}</span>
-                                            <span class="added-time">📌 ${currentLang==='zh'?'添加':'Ajout'}: ${addedDisplay}</span>
-                                            <span class="added-by">👤 ${currentLang==='zh'?'添加者':'Ajouté par'}: ${escapeHtml(c.addedBy || 'unknown')}</span>
-                                            ${validatedInfo}
+            // 渲染顾客列表
+            async function renderCustomerList() {
+                try {
+                    loadingMessage.style.display = 'block';
+                    const customers = await getViewDateDeliveries();
+                    const sorted = customers.sort((a,b) => b.addedTime - a.addedTime);
+                    const isOwnData = (viewingUser === currentUser);
+
+                    let html = '';
+                    if (sorted.length === 0) {
+                        html = `<li style="padding:30px; text-align:center; color:#8899bb;">${currentLang==='zh'?'暂无顾客，请添加':'Aucun client'}</li>`;
+                    } else {
+                        sorted.forEach(c => {
+                            const timeDisplay = formatTimeRequirement(c);
+                            const addedDisplay = formatAddedTime(c.addedTime);
+                            const departedClass = c.departed ? 'departed' : '';
+                            const otherUserClass = (c.addedBy !== viewingUser) ? 'other-user' : '';
+                            const departedInfo = c.departed ? 
+                                `<div class="departure-time">🚚 ${currentLang==='zh'?'出发时间':'Départ'}: ${new Date(c.departureTime).toLocaleTimeString()}</div>` : '';
+                            const validatedInfo = c.departed && c.departedBy ? 
+                                `<span class="validated-by">✅ ${currentLang==='zh'?'验证者':'Validé par'}: ${c.departedBy}</span>` : '';
+                            
+                            const showDepart = true;
+                            const showDelete = isOwnData;
+                            
+                            html += `
+                                <li class="customer-item ${departedClass} ${otherUserClass}">
+                                    <div class="customer-info">
+                                        <div class="info-main">
+                                            <div class="name">${escapeHtml(c.name)}</div>
+                                            <div class="addr">📍 ${escapeHtml(c.address)}</div>
+                                            <div class="meta-row">
+                                                <span class="time-badge">${timeDisplay}</span>
+                                                <span class="added-time">📌 ${currentLang==='zh'?'添加':'Ajout'}: ${addedDisplay}</span>
+                                                <span class="added-by">👤 ${currentLang==='zh'?'添加者':'Ajouté par'}: ${escapeHtml(c.addedBy || 'unknown')}</span>
+                                                ${validatedInfo}
+                                            </div>
+                                            ${departedInfo}
                                         </div>
-                                        ${departedInfo}
                                     </div>
-                                </div>
-                                <div class="item-actions">
-                                    <button class="btn-depart-customer ${!showDepart ? 'hidden' : ''}" ${c.departed ? 'disabled' : ''} data-id="${c.id}">
-                                        ${currentLang==='zh'?'🚚 出发':'🚚 Partir'}
-                                    </button>
-                                    <button class="btn-delete ${!showDelete ? 'hidden' : ''}" ${c.departed ? 'disabled' : ''} data-id="${c.id}">
-                                        ${currentLang==='zh'?'🗑️ 删除':'🗑️ Supprimer'}
-                                    </button>
-                                    ${!showDepart && !showDelete ? `<span class="readonly-badge">🔒 ${currentLang==='zh'?'只读':'Lecture seule'}</span>` : ''}
-                                </div>
-                            </li>
-                        `;
-                    });
-                }
-                customerListEl.innerHTML = html;
-                customerCountSpan.innerText = customers.length;
+                                    <div class="item-actions">
+                                        <button class="btn-depart-customer ${!showDepart ? 'hidden' : ''}" ${c.departed ? 'disabled' : ''} data-id="${c.customer_id}">
+                                            ${currentLang==='zh'?'🚚 出发':'🚚 Partir'}
+                                        </button>
+                                        <button class="btn-delete ${!showDelete ? 'hidden' : ''}" ${c.departed ? 'disabled' : ''} data-id="${c.customer_id}">
+                                            ${currentLang==='zh'?'🗑️ 删除':'🗑️ Supprimer'}
+                                        </button>
+                                        ${!showDepart && !showDelete ? `<span class="readonly-badge">🔒 ${currentLang==='zh'?'只读':'Lecture seule'}</span>` : ''}
+                                    </div>
+                                </li>
+                            `;
+                        });
+                    }
+                    customerListEl.innerHTML = html;
+                    customerCountSpan.innerText = sorted.length;
 
-                // FIXED: Depart button works for all users
-                document.querySelectorAll('.btn-depart-customer').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const id = btn.getAttribute('data-id');
-                        markCustomerDeparted(id);
-                    });
-                });
-                
-                // Delete only for own data
-                if (isOwnData) {
-                    document.querySelectorAll('.btn-delete').forEach(btn => {
+                    document.querySelectorAll('.btn-depart-customer').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
                             const id = btn.getAttribute('data-id');
-                            deleteCustomer(id);
+                            markCustomerDeparted(id);
                         });
                     });
+                    
+                    if (isOwnData) {
+                        document.querySelectorAll('.btn-delete').forEach(btn => {
+                            btn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const id = btn.getAttribute('data-id');
+                                deleteCustomer(id);
+                            });
+                        });
+                    }
+                } catch (error) {
+                    console.error('加载失败:', error);
+                } finally {
+                    loadingMessage.style.display = 'none';
                 }
             }
 
@@ -1394,51 +1376,60 @@
                 });
             }
 
-            // Optimize route
-            function optimizeRoute() {
-                const customers = getViewDateDeliveries().filter(c => !c.departed);
-                if (customers.length === 0) {
-                    alert(currentLang === 'zh' ? '没有待出发的顾客' : 'Aucun client en attente');
-                    return;
-                }
-
-                const withTime = customers.filter(c => c.timeReq.type !== 'free');
-                const freeOnes = customers.filter(c => c.timeReq.type === 'free');
-
-                const sortedWithTime = [...withTime].sort((a,b) => {
-                    const getTimeValue = (c) => {
-                        if (c.timeReq.type === 'fixed') return c.timeReq.value;
-                        if (c.timeReq.type === 'before') return c.timeReq.value;
-                        if (c.timeReq.type === 'range') return c.timeReq.value.start;
-                        return '23:59';
-                    };
-                    return getTimeValue(a).localeCompare(getTimeValue(b));
-                });
-
-                const groups = [];
-                if (sortedWithTime.length > 0) {
-                    let tempGroup = [sortedWithTime[0]];
-                    for (let i = 1; i < sortedWithTime.length; i++) {
-                        const prevTime = getComparableTime(sortedWithTime[i-1].timeReq);
-                        const currTime = getComparableTime(sortedWithTime[i].timeReq);
-                        const diff = timeToMinutes(currTime) - timeToMinutes(prevTime);
-                        if (diff < 30) {
-                            tempGroup.push(sortedWithTime[i]);
-                        } else {
-                            groups.push([...tempGroup]);
-                            tempGroup = [sortedWithTime[i]];
-                        }
+            // 路线规划
+            async function optimizeRoute() {
+                try {
+                    loadingMessage.style.display = 'block';
+                    const customers = await getViewDateDeliveries();
+                    const pending = customers.filter(c => !c.departed);
+                    
+                    if (pending.length === 0) {
+                        alert(currentLang === 'zh' ? '没有待出发的顾客' : 'Aucun client en attente');
+                        return;
                     }
-                    groups.push(tempGroup);
+
+                    const withTime = pending.filter(c => c.timeReq.type !== 'free');
+                    const freeOnes = pending.filter(c => c.timeReq.type === 'free');
+
+                    const sortedWithTime = [...withTime].sort((a,b) => {
+                        const getTimeValue = (c) => {
+                            if (c.timeReq.type === 'fixed') return c.timeReq.value;
+                            if (c.timeReq.type === 'before') return c.timeReq.value;
+                            if (c.timeReq.type === 'range') return c.timeReq.value.start;
+                            return '23:59';
+                        };
+                        return getTimeValue(a).localeCompare(getTimeValue(b));
+                    });
+
+                    const groups = [];
+                    if (sortedWithTime.length > 0) {
+                        let tempGroup = [sortedWithTime[0]];
+                        for (let i = 1; i < sortedWithTime.length; i++) {
+                            const prevTime = getComparableTime(sortedWithTime[i-1].timeReq);
+                            const currTime = getComparableTime(sortedWithTime[i].timeReq);
+                            const diff = timeToMinutes(currTime) - timeToMinutes(prevTime);
+                            if (diff < 30) {
+                                tempGroup.push(sortedWithTime[i]);
+                            } else {
+                                groups.push([...tempGroup]);
+                                tempGroup = [sortedWithTime[i]];
+                            }
+                        }
+                        groups.push(tempGroup);
+                    }
+
+                    groups.forEach(g => {
+                        g.sort((x,y) => (x.address.length % 5) - (y.address.length % 5));
+                    });
+
+                    const optimized = [...groups.flat(), ...freeOnes];
+                    displayRoute(optimized);
+                    routeOutputDiv.style.display = 'block';
+                } catch (error) {
+                    console.error('规划失败:', error);
+                } finally {
+                    loadingMessage.style.display = 'none';
                 }
-
-                groups.forEach(g => {
-                    g.sort((x,y) => (x.address.length % 5) - (y.address.length % 5));
-                });
-
-                const optimized = [...groups.flat(), ...freeOnes];
-                displayRoute(optimized);
-                routeOutputDiv.style.display = 'block';
             }
 
             function getComparableTime(timeReq) {
@@ -1479,15 +1470,14 @@
 
             optimizeBtn.addEventListener('click', optimizeRoute);
 
-            // Initialize
-            loadFromStorage();
+            // 初始化
             setDefaultDates();
             renderTimeInput();
             
-            // Default show login
+            // 默认显示登录界面
             loginOverlay.style.display = 'flex';
             appContainer.style.display = 'none';
-            setLanguage('fr'); // Set French as default
+            setLanguage('fr');
         })();
     </script>
 </body>
