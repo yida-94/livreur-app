@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Livreurs · 地理位置路线版</title>
+    <title>Livreurs · 路线优化版</title>
     <style>
         * {
             box-sizing: border-box;
@@ -18,18 +18,31 @@
             padding: 16px;
         }
         .app-container {
-            max-width: 900px;
+            max-width: 1000px;
             width: 100%;
             background: white;
             border-radius: 40px;
             padding: 24px 20px;
             box-shadow: 0 30px 50px rgba(0,0,0,0.1);
         }
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
         .login-box {
             background: #f5faff;
             border-radius: 30px;
             padding: 40px;
             max-width: 400px;
+            width: 90%;
             margin: 0 auto;
         }
         .login-box h2 {
@@ -130,6 +143,7 @@
             border-radius: 40px;
             padding: 8px 18px;
             cursor: pointer;
+            transition: all 0.2s;
         }
         .user-button.active {
             background: #2b5879;
@@ -283,6 +297,10 @@
             border-radius: 30px;
             cursor: pointer;
         }
+        .btn-delete:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
         .readonly-badge {
             background: #ff9800;
             color: white;
@@ -303,20 +321,43 @@
         }
         .route-steps {
             list-style: none;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
         }
         .route-steps li {
-            padding: 10px;
+            padding: 15px;
             border-bottom: 1px dashed #b5cde0;
+        }
+        .start-point {
+            background: #c8e6c9;
+            border-radius: 30px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid #4caf50;
+        }
+        .time-estimate {
+            background: #fff3e0;
+            border-radius: 20px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        .urgent-badge {
+            background: #ff5252;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            margin-left: 5px;
         }
     </style>
 </head>
 <body>
-    <!-- 登录/注册界面 -->
-    <div class="login-overlay" id="loginOverlay" style="position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:1000;">
+    <!-- 登录界面 -->
+    <div class="login-overlay" id="loginOverlay">
         <div class="login-box">
-            <h2 id="loginTitle">🔐 Connexion</h2>
+            <h2>🔐 Connexion</h2>
             
             <!-- 登录表单 -->
             <div id="loginForm">
@@ -345,7 +386,7 @@
             <button class="logout-btn" id="logoutBtn">Déconnexion</button>
         </div>
 
-        <!-- 管理员专属区域 -->
+        <!-- 管理员区域 -->
         <div class="admin-section" id="adminSection" style="display: none;">
             <h3>👥 使用者管理 (管理员)</h3>
             <div class="user-list" id="userList"></div>
@@ -357,7 +398,7 @@
             <div class="user-buttons" id="userSelectorButtons"></div>
         </div>
 
-        <!-- 双日期选择 -->
+        <!-- 日期选择 -->
         <div class="dual-date-section">
             <div class="date-card">
                 <div class="label">📅 Date d'ajout</div>
@@ -401,6 +442,7 @@
         <button class="btn-add" id="optimizeRouteBtn" style="background:#ff9f4b; color:#aa5f1e; margin-top:10px;">🗺️ Optimiser l'itinéraire</button>
         <div id="routeOutput" style="display:none; margin-top:20px; padding:16px; background:#edf4fd; border-radius:24px;">
             <h4>🚚 Ordre de livraison suggéré</h4>
+            <div id="startPointInfo" class="start-point"></div>
             <ul class="route-steps" id="routeStepsList"></ul>
             <div id="routeNote" style="font-size:0.8rem; color:#3a5b7a; margin-top:10px;"></div>
         </div>
@@ -408,7 +450,7 @@
 
     <script>
         (function() {
-            // 固定用户（硬编码）
+            // 固定用户
             const FIXED_USERS = {
                 'admin': '1234',
                 'tayfun': '1909',
@@ -416,11 +458,21 @@
                 'steve': '94'
             };
 
-            // 本地存储键
-            const STORAGE_KEY = 'livreur_customers_v2';
-            const USERS_KEY = 'livreur_users_v2';
+            // 固定起点
+            const START_POINT = {
+                address: '98 Rue Anselme Rondenay, 94400 Vitry-sur-Seine',
+                lat: null,
+                lon: null
+            };
 
-            // 初始化本地存储
+            // 送货时间范围（分钟）
+            const DELIVERY_TIME_RANGE = { min: 30, max: 45 };
+
+            // 本地存储键
+            const STORAGE_KEY = 'livreur_customers_v5';
+            const USERS_KEY = 'livreur_users_v5';
+
+            // 初始化存储
             function initStorage() {
                 if (!localStorage.getItem(STORAGE_KEY)) {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
@@ -441,7 +493,7 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
             }
 
-            // 获取所有用户（包含注册用户）
+            // 获取所有用户
             function getAllUsers() {
                 const registered = JSON.parse(localStorage.getItem(USERS_KEY)) || {};
                 return { ...FIXED_USERS, ...registered };
@@ -489,6 +541,7 @@
             const routeOutputDiv = document.getElementById('routeOutput');
             const routeStepsList = document.getElementById('routeStepsList');
             const routeNote = document.getElementById('routeNote');
+            const startPointInfo = document.getElementById('startPointInfo');
             const nameInput = document.getElementById('customerName');
             const addrInput = document.getElementById('customerAddr');
             const timeType = document.getElementById('timeType');
@@ -577,18 +630,15 @@
                 }
                 
                 if (confirm(`确定删除用户 ${username} 吗？`)) {
-                    // 从固定用户中删除？
                     if (FIXED_USERS[username]) {
                         alert('不能删除固定用户');
                         return;
                     }
                     
-                    // 从注册用户中删除
                     const registered = JSON.parse(localStorage.getItem(USERS_KEY)) || {};
                     delete registered[username];
                     saveRegisteredUsers(registered);
                     
-                    // 删除该用户的所有顾客数据
                     const allCustomers = getAllCustomers();
                     const filtered = allCustomers.filter(c => c.username !== username);
                     saveCustomers(filtered);
@@ -599,7 +649,7 @@
                 }
             };
 
-            // 渲染用户列表（管理员）
+            // 渲染用户列表
             function renderUserList() {
                 if (currentUser !== 'admin') return;
                 
@@ -728,6 +778,61 @@
                 return '⏰ Libre';
             }
 
+            // 获取时间窗口长度（分钟）
+            function getTimeWindowLength(customer) {
+                if (!customer.time_req) return 24 * 60; // 自由安排算24小时
+                if (customer.time_req.type === 'free') return 24 * 60;
+                if (customer.time_req.type === 'fixed') return 0; // 固定时间窗口为0
+                if (customer.time_req.type === 'before') {
+                    const [h, m] = customer.time_req.value.split(':').map(Number);
+                    return h * 60 + m;
+                }
+                if (customer.time_req.type === 'range') {
+                    const [h1, m1] = customer.time_req.value.start.split(':').map(Number);
+                    const [h2, m2] = customer.time_req.value.end.split(':').map(Number);
+                    return (h2 * 60 + m2) - (h1 * 60 + m1);
+                }
+                return 24 * 60;
+            }
+
+            // 获取开始时间（分钟）
+            function getStartTimeMinutes(customer) {
+                if (!customer.time_req) return 24 * 60;
+                if (customer.time_req.type === 'free') return 24 * 60;
+                if (customer.time_req.type === 'fixed') {
+                    const [h, m] = customer.time_req.value.split(':').map(Number);
+                    return h * 60 + m;
+                }
+                if (customer.time_req.type === 'before') {
+                    const [h, m] = customer.time_req.value.split(':').map(Number);
+                    return h * 60 + m;
+                }
+                if (customer.time_req.type === 'range') {
+                    const [h, m] = customer.time_req.value.start.split(':').map(Number);
+                    return h * 60 + m;
+                }
+                return 24 * 60;
+            }
+
+            // 获取结束时间（分钟）
+            function getEndTimeMinutes(customer) {
+                if (!customer.time_req) return 24 * 60;
+                if (customer.time_req.type === 'free') return 24 * 60;
+                if (customer.time_req.type === 'fixed') {
+                    const [h, m] = customer.time_req.value.split(':').map(Number);
+                    return h * 60 + m;
+                }
+                if (customer.time_req.type === 'before') {
+                    const [h, m] = customer.time_req.value.split(':').map(Number);
+                    return h * 60 + m;
+                }
+                if (customer.time_req.type === 'range') {
+                    const [h, m] = customer.time_req.value.end.split(':').map(Number);
+                    return h * 60 + m;
+                }
+                return 24 * 60;
+            }
+
             // 格式化添加时间
             function formatAddedTime(timestamp) {
                 if (!timestamp) return '';
@@ -740,9 +845,9 @@
                 });
             }
 
-            // 计算两点距离（Haversine公式）
+            // 计算两点距离
             function calculateDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371; // 地球半径（公里）
+                const R = 6371;
                 const dLat = (lat2 - lat1) * Math.PI / 180;
                 const dLon = (lon2 - lon1) * Math.PI / 180;
                 const a = 
@@ -751,6 +856,15 @@
                     Math.sin(dLon/2) * Math.sin(dLon/2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 return R * c;
+            }
+
+            // 获取比较时间
+            function getCompareTime(customer) {
+                if (!customer.time_req || customer.time_req.type === 'free') return '23:59';
+                if (customer.time_req.type === 'fixed') return customer.time_req.value;
+                if (customer.time_req.type === 'before') return customer.time_req.value;
+                if (customer.time_req.type === 'range') return customer.time_req.value.start;
+                return '23:59';
             }
 
             // 添加顾客
@@ -782,7 +896,7 @@
                     departed: false,
                     departure_time: null,
                     departed_by: null,
-                    lat: null,  // 初始无坐标
+                    lat: null,
                     lon: null
                 };
 
@@ -906,269 +1020,170 @@
                     .replace(/'/g, "&#039;");
             }
 
-            // ==================== 真正的路线规划（时间+距离） ====================
-optimizeBtn.addEventListener('click', async () => {
-    const allCustomers = getAllCustomers();
-    const pending = allCustomers.filter(c => 
-        c.username === viewingUser && 
-        c.driver === currentDriver && 
-        c.date === viewDate &&
-        !c.departed
-    );
-    
-    if (pending.length === 0) {
-        alert('Aucun client en attente');
-        return;
-    }
-
-    optimizeBtn.innerHTML = '🔄 Calcul...';
-    optimizeBtn.disabled = true;
-    loadingMessage.style.display = 'block';
-    routeOutputDiv.style.display = 'none';
-
-    try {
-        // 第一步：为每个地址获取经纬度
-        const customersWithCoords = [];
-        
-        for (const customer of pending) {
-            if (customer.lat && customer.lon) {
-                customersWithCoords.push(customer);
-                continue;
-            }
-            
-            try {
-                const address = customer.customer_address;
-                const response = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=fr&limit=1`,
-                    { headers: { 'User-Agent': 'Livreur-App/1.0' } }
-                );
-                const data = await response.json();
+            // 获取起点的经纬度
+            async function getStartPointCoords() {
+                if (START_POINT.lat && START_POINT.lon) return;
                 
-                if (data && data.length > 0) {
-                    customer.lat = parseFloat(data[0].lat);
-                    customer.lon = parseFloat(data[0].lon);
-                    customersWithCoords.push(customer);
-                    
-                    // 更新存储
-                    const all = getAllCustomers();
-                    const idx = all.findIndex(c => c.id === customer.id);
-                    if (idx !== -1) {
-                        all[idx].lat = customer.lat;
-                        all[idx].lon = customer.lon;
-                        saveCustomers(all);
-                    }
-                    
-                    await new Promise(r => setTimeout(r, 200));
-                } else {
-                    customersWithCoords.push(customer);
-                }
-            } catch (error) {
-                customersWithCoords.push(customer);
-            }
-        }
-        
-        // 第二步：分离有坐标和没坐标的
-        const withCoords = customersWithCoords.filter(c => c.lat && c.lon);
-        const withoutCoords = customersWithCoords.filter(c => !c.lat || !c.lon);
-        
-        // 第三步：如果没有任何坐标，按时间排序
-        if (withCoords.length === 0) {
-            withoutCoords.sort((a, b) => {
-                const timeA = getCompareTime(a);
-                const timeB = getCompareTime(b);
-                return timeA.localeCompare(timeB);
-            });
-            displayRoute(withoutCoords, 0);
-            return;
-        }
-        
-        // 第四步：计算时间优先级（用于选择起点）
-        function getTimePriority(customer) {
-            if (!customer.time_req || customer.time_req.type === 'free') return 10; // 自由安排优先级最低
-            
-            const now = new Date();
-            const currentHour = now.getHours() + now.getMinutes() / 60;
-            
-            if (customer.time_req.type === 'fixed') {
-                const [h, m] = customer.time_req.value.split(':').map(Number);
-                const fixedHour = h + m / 60;
-                return Math.max(1, Math.floor((fixedHour - currentHour) * 10));
-            }
-            
-            if (customer.time_req.type === 'before') {
-                const [h, m] = customer.time_req.value.split(':').map(Number);
-                const deadlineHour = h + m / 60;
-                return Math.max(1, Math.floor((deadlineHour - currentHour) * 10));
-            }
-            
-            if (customer.time_req.type === 'range') {
-                const [h, m] = customer.time_req.value.start.split(':').map(Number);
-                const startHour = h + m / 60;
-                return Math.max(1, Math.floor((startHour - currentHour) * 10));
-            }
-            
-            return 10;
-        }
-        
-        // 第五步：真正的最近邻算法（从上一个位置找最近的下一个）
-        function findOptimalRoute(points) {
-            if (points.length <= 1) return points;
-            
-            // 先按时间优先级排序，选择起点
-            const pointsWithPriority = points.map(p => ({
-                ...p,
-                priority: getTimePriority(p)
-            }));
-            
-            // 起点：时间最紧急的（priority最小）
-            pointsWithPriority.sort((a, b) => a.priority - b.priority);
-            const start = pointsWithPriority[0];
-            
-            let route = [start];
-            let remaining = pointsWithPriority.filter(p => p.id !== start.id);
-            
-            // 贪婪算法：每次都找离当前位置最近的下一个
-            while (remaining.length > 0) {
-                const current = route[route.length - 1];
-                
-                let bestIdx = 0;
-                let bestDist = Infinity;
-                
-                for (let i = 0; i < remaining.length; i++) {
-                    const dist = calculateDistance(
-                        current.lat, current.lon,
-                        remaining[i].lat, remaining[i].lon
+                try {
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(START_POINT.address)}&countrycodes=fr&limit=1`,
+                        { headers: { 'User-Agent': 'Livreur-App/1.0' } }
                     );
+                    const data = await response.json();
                     
-                    // 如果距离小于10公里，并且时间优先级不太高，可以优先考虑
-                    const timeBonus = remaining[i].priority < 5 ? 0.5 : 1;
-                    
-                    if (dist * timeBonus < bestDist) {
-                        bestDist = dist * timeBonus;
-                        bestIdx = i;
+                    if (data && data.length > 0) {
+                        START_POINT.lat = parseFloat(data[0].lat);
+                        START_POINT.lon = parseFloat(data[0].lon);
                     }
+                } catch (error) {
+                    console.error('获取起点坐标失败:', error);
                 }
-                
-                route.push(remaining[bestIdx]);
-                remaining = remaining.filter((_, i) => i !== bestIdx);
             }
-            
-            return route;
-        }
-        
-        // 第六步：执行优化
-        let optimizedRoute = [];
-        
-        if (withCoords.length > 0) {
-            optimizedRoute = findOptimalRoute(withCoords);
-        }
-        
-        // 第七步：把没坐标的按时间排序加到后面
-        withoutCoords.sort((a, b) => {
-            const timeA = getCompareTime(a);
-            const timeB = getCompareTime(b);
-            return timeA.localeCompare(timeB);
-        });
-        
-        const finalRoute = [...optimizedRoute, ...withoutCoords];
-        
-        // 第八步：显示结果
-        displayRoute(finalRoute, withCoords.length);
-        
-    } catch (error) {
-        console.error('路线规划失败:', error);
-        alert('Erreur: ' + error.message);
-    } finally {
-        optimizeBtn.innerHTML = '🗺️ Optimiser l\'itinéraire';
-        optimizeBtn.disabled = false;
-        loadingMessage.style.display = 'none';
-    }
-});
 
-// 辅助函数：获取比较时间
-function getCompareTime(customer) {
-    if (!customer.time_req || customer.time_req.type === 'free') return '23:59';
-    if (customer.time_req.type === 'fixed') return customer.time_req.value;
-    if (customer.time_req.type === 'before') return customer.time_req.value;
-    if (customer.time_req.type === 'range') return customer.time_req.value.start;
-    return '23:59';
-}
+            // 路线规划 - 修正版
+            optimizeBtn.addEventListener('click', async () => {
+                const allCustomers = getAllCustomers();
+                const pending = allCustomers.filter(c => 
+                    c.username === viewingUser && 
+                    c.driver === currentDriver && 
+                    c.date === viewDate &&
+                    !c.departed
+                );
+                
+                if (pending.length === 0) {
+                    alert('Aucun client en attente');
+                    return;
+                }
 
-// 显示路线
-function displayRoute(route, withCoordCount) {
-    let stepsHtml = '';
-    let totalDistance = 0;
-    let prevLat = null, prevLon = null;
-    
-    route.forEach((c, idx) => {
-        const timeDisplay = formatTimeRequirement(c);
-        const hasCoords = c.lat && c.lon ? '🟢' : '🟡';
-        
-        // 计算距离
-        let distanceText = '';
-        if (prevLat && prevLon && c.lat && c.lon) {
-            const dist = calculateDistance(prevLat, prevLon, c.lat, c.lon);
-            totalDistance += dist;
-            distanceText = `<span style="background:#e1f5fe; padding:2px 8px; border-radius:20px; font-size:0.7rem;">🚗 ${dist.toFixed(1)}km</span>`;
-        }
-        
-        stepsHtml += `
-            <li style="display: flex; align-items: flex-start; padding: 12px; border-bottom: 1px dashed #ccc;">
-                <span style="background:#f09b4b; color:white; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; margin-right:10px; flex-shrink:0;">${idx+1}</span>
-                <div style="flex:1;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <strong>${escapeHtml(c.customer_name)}</strong>
-                        <span style="background:#e6d5b8; padding:2px 8px; border-radius:20px; font-size:0.7rem;">👤 ${escapeHtml(c.added_by)}</span>
-                    </div>
-                    <div style="font-size:0.9rem; color:#666;">${escapeHtml(c.customer_address)} ${hasCoords}</div>
-                    <div style="display:flex; gap:8px; flex-wrap: wrap; margin-top:5px;">
-                        <span style="background:#ffe6c0; padding:2px 8px; border-radius:20px; font-size:0.8rem;">${timeDisplay}</span>
-                        ${distanceText}
-                    </div>
-                </div>
-            </li>
-        `;
-        
-        if (c.lat && c.lon) {
-            prevLat = c.lat;
-            prevLon = c.lon;
-        }
-    });
-    
-    routeStepsList.innerHTML = stepsHtml;
-    
-    routeNote.innerHTML = `
-        <div style="background:#f5f5f5; padding:15px; border-radius:20px; margin-top:15px;">
-            <p><strong>📊 统计</strong></p>
-            <p>🚗 总距离: ${totalDistance.toFixed(1)} km</p>
-            <p>📍 有坐标: ${withCoordCount} 个 (路线优化) | 🟡 无坐标: ${route.length - withCoordCount} 个 (按时间)</p>
-            <p><small>🟢 有坐标 | 🟡 无坐标（按时间排序）</small></p>
-            <p><small>* 真正的最短路径算法：从最紧急的客户开始，每次都找最近的下一个</small></p>
-        </div>
-    `;
-    
-    routeOutputDiv.style.display = 'block';
-}
+                optimizeBtn.innerHTML = '🔄 Calcul...';
+                optimizeBtn.disabled = true;
+                loadingMessage.style.display = 'block';
+                routeOutputDiv.style.display = 'none';
 
-
-
+                try {
+                    // 获取起点坐标
+                    await getStartPointCoords();
                     
-                    routeStepsList.innerHTML = stepsHtml;
+                    // 获取所有顾客的经纬度
+                    const customersWithCoords = [];
                     
-                    // 添加统计信息
-                    routeNote.innerHTML = `
-                        <div style="background:#f5f5f5; padding:15px; border-radius:20px; margin-top:15px;">
-                            <p><strong>📊 统计</strong></p>
-                            <p>🚗 总距离: ${totalDistance.toFixed(1)} km</p>
-                            <p>📍 有坐标: ${optimized.length} 个 (路线优化) | 🟡 无坐标: ${withoutCoords.length} 个 (按时间)</p>
-                            <p><small>🟢 有坐标 | 🟡 无坐标（按时间排序）</small></p>
-                            <p><small>🔴 紧急: 时间在3小时内</small></p>
-                            <p><small>* 路线结合了时间和距离优化，时间越紧急的顾客越优先</small></p>
-                        </div>
-                    `;
+                    for (const customer of pending) {
+                        if (customer.lat && customer.lon) {
+                            customersWithCoords.push(customer);
+                            continue;
+                        }
+                        
+                        try {
+                            const address = customer.customer_address;
+                            const response = await fetch(
+                                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=fr&limit=1`,
+                                { headers: { 'User-Agent': 'Livreur-App/1.0' } }
+                            );
+                            const data = await response.json();
+                            
+                            if (data && data.length > 0) {
+                                customer.lat = parseFloat(data[0].lat);
+                                customer.lon = parseFloat(data[0].lon);
+                                customersWithCoords.push(customer);
+                                
+                                const all = getAllCustomers();
+                                const idx = all.findIndex(c => c.id === customer.id);
+                                if (idx !== -1) {
+                                    all[idx].lat = customer.lat;
+                                    all[idx].lon = customer.lon;
+                                    saveCustomers(all);
+                                }
+                                
+                                await new Promise(r => setTimeout(r, 200));
+                            } else {
+                                customersWithCoords.push(customer);
+                            }
+                        } catch (error) {
+                            customersWithCoords.push(customer);
+                        }
+                    }
                     
-                    routeOutputDiv.style.display = 'block';
-
+                    // 分离有坐标和没坐标的
+                    const withCoords = customersWithCoords.filter(c => c.lat && c.lon);
+                    const withoutCoords = customersWithCoords.filter(c => !c.lat || !c.lon);
+                    
+                    // 计算每个顾客的优先级分数（分数越低越优先）
+                    function calculatePriority(customer) {
+                        if (!customer.time_req || customer.time_req.type === 'free') {
+                            return 1000; // 自由安排优先级最低
+                        }
+                        
+                        const startTime = getStartTimeMinutes(customer);
+                        const endTime = getEndTimeMinutes(customer);
+                        const windowLength = endTime - startTime;
+                        
+                        // 当前时间（假设9点出发）
+                        const currentTime = 9 * 60;
+                        
+                        // 如果开始时间已经过了，很紧急
+                        if (startTime < currentTime) {
+                            return 1;
+                        }
+                        
+                        // 基础分：开始时间越早越优先
+                        const baseScore = startTime;
+                        
+                        // 窗口长度越短越优先（每短1分钟加1分紧急度）
+                        const urgencyBonus = Math.max(0, 120 - windowLength) / 2;
+                        
+                        return baseScore - urgencyBonus;
+                    }
+                    
+                    // 按优先级排序
+                    withCoords.sort((a, b) => {
+                        return calculatePriority(a) - calculatePriority(b);
+                    });
+                    
+                    // 构建最终路线
+                    let finalRoute = [];
+                    let remaining = [...withCoords];
+                    
+                    // 第一个点：优先级最高的
+                    if (remaining.length > 0) {
+                        finalRoute.push(remaining[0]);
+                        remaining = remaining.slice(1);
+                    }
+                    
+                    // 后续点：从当前位置找最近的下一个
+                    while (remaining.length > 0) {
+                        const current = finalRoute[finalRoute.length - 1];
+                        
+                        let bestIdx = 0;
+                        let bestDist = Infinity;
+                        
+                        for (let i = 0; i < remaining.length; i++) {
+                            const dist = calculateDistance(
+                                current.lat, current.lon,
+                                remaining[i].lat, remaining[i].lon
+                            );
+                            
+                            if (dist < bestDist) {
+                                bestDist = dist;
+                                bestIdx = i;
+                            }
+                        }
+                        
+                        finalRoute.push(remaining[bestIdx]);
+                        remaining = remaining.filter((_, i) => i !== bestIdx);
+                    }
+                    
+                    // 没坐标的按开始时间排序
+                    withoutCoords.sort((a, b) => {
+                        const startA = getStartTimeMinutes(a);
+                        const startB = getStartTimeMinutes(b);
+                        return startA - startB;
+                    });
+                    
+                    finalRoute = [...finalRoute, ...withoutCoords];
+                    
+                    // 显示路线和时间预估
+                    displayRouteWithTimes(finalRoute, withCoords.length);
+                    
                 } catch (error) {
                     console.error('路线规划失败:', error);
                     alert('Erreur: ' + error.message);
@@ -1178,6 +1193,114 @@ function displayRoute(route, withCoordCount) {
                     loadingMessage.style.display = 'none';
                 }
             });
+
+            // 显示路线和时间预估
+            function displayRouteWithTimes(route, withCoordCount) {
+                let stepsHtml = '';
+                let totalDistance = 0;
+                let prevLat = START_POINT.lat;
+                let prevLon = START_POINT.lon;
+                
+                // 起点信息
+                startPointInfo.innerHTML = `
+                    <strong>🚩 Départ:</strong> ${START_POINT.address}<br>
+                    <small>Heure de départ suggérée: 09:00</small>
+                `;
+                
+                // 计算每个站点的预计时间
+                let currentTime = new Date();
+                currentTime.setHours(9, 0, 0); // 假设9点出发
+                
+                route.forEach((c, idx) => {
+                    const timeDisplay = formatTimeRequirement(c);
+                    const hasCoords = c.lat && c.lon ? '🟢' : '🟡';
+                    
+                    // 计算紧急程度
+                    const startTime = getStartTimeMinutes(c);
+                    const endTime = getEndTimeMinutes(c);
+                    const windowLength = endTime - startTime;
+                    
+                    let urgencyBadge = '';
+                    if (c.time_req && c.time_req.type !== 'free') {
+                        if (windowLength <= 60) {
+                            urgencyBadge = '<span class="urgent-badge">🔴 URGENT</span>';
+                        } else if (windowLength <= 120) {
+                            urgencyBadge = '<span class="urgent-badge" style="background:#ff9800;">🟠 Pressé</span>';
+                        }
+                    }
+                    
+                    // 计算距离和行驶时间
+                    let distanceText = '';
+                    let travelTime = 0;
+                    let arrivalTime = '';
+                    
+                    if (prevLat && prevLon && c.lat && c.lon) {
+                        const dist = calculateDistance(prevLat, prevLon, c.lat, c.lon);
+                        totalDistance += dist;
+                        
+                        // 行驶时间 = 距离 / 30km/h * 60分钟
+                        travelTime = Math.round(dist / 30 * 60);
+                        
+                        // 送货时间 = 30-45分钟随机
+                        const deliveryTime = Math.floor(Math.random() * (DELIVERY_TIME_RANGE.max - DELIVERY_TIME_RANGE.min + 1)) + DELIVERY_TIME_RANGE.min;
+                        
+                        // 到达时间 = 当前时间 + 行驶时间 + 送货时间
+                        currentTime.setMinutes(currentTime.getMinutes() + travelTime + deliveryTime);
+                        
+                        arrivalTime = currentTime.toLocaleTimeString('fr-FR', { 
+                            hour: '2-digit', 
+                            minute: '2-digit'
+                        });
+                        
+                        distanceText = `
+                            <div class="time-estimate">
+                                🚗 ${dist.toFixed(1)}km (${travelTime}min)
+                                📦 Livraison: ${deliveryTime}min
+                                🕒 Arrivée: ${arrivalTime}
+                                ${urgencyBadge}
+                            </div>
+                        `;
+                    }
+                    
+                    stepsHtml += `
+                        <li style="display: flex; align-items: flex-start; padding: 12px; border-bottom: 1px dashed #ccc;">
+                            <span style="background:#f09b4b; color:white; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; margin-right:10px; flex-shrink:0;">${idx+1}</span>
+                            <div style="flex:1;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <strong>${escapeHtml(c.customer_name)}</strong>
+                                    <span style="background:#e6d5b8; padding:2px 8px; border-radius:20px; font-size:0.7rem;">👤 ${escapeHtml(c.added_by)}</span>
+                                </div>
+                                <div style="font-size:0.9rem; color:#666;">${escapeHtml(c.customer_address)} ${hasCoords}</div>
+                                <div style="display:flex; gap:8px; flex-wrap: wrap; margin-top:5px;">
+                                    <span style="background:#ffe6c0; padding:2px 8px; border-radius:20px; font-size:0.8rem;">${timeDisplay}</span>
+                                </div>
+                                ${distanceText}
+                            </div>
+                        </li>
+                    `;
+                    
+                    if (c.lat && c.lon) {
+                        prevLat = c.lat;
+                        prevLon = c.lon;
+                    }
+                });
+                
+                routeStepsList.innerHTML = stepsHtml;
+                
+                routeNote.innerHTML = `
+                    <div style="background:#f5f5f5; padding:15px; border-radius:20px; margin-top:15px;">
+                        <p><strong>📊 统计</strong></p>
+                        <p>🚗 总距离: ${totalDistance.toFixed(1)} km</p>
+                        <p>📍 有坐标: ${withCoordCount} 个 | 🟡 无坐标: ${route.length - withCoordCount} 个</p>
+                        <p><small>🟢 有坐标 | 🟡 无坐标（按时间排序）</small></p>
+                        <p><small>🔴 URGENT: 窗口≤1小时 | 🟠 Pressé: 窗口≤2小时</small></p>
+                        <p><small>* 行驶速度按30km/h估算，每站送货30-45分钟</small></p>
+                        <p><small>* 排序规则: 先按紧急程度，再按距离优化</small></p>
+                    </div>
+                `;
+                
+                routeOutputDiv.style.display = 'block';
+            }
 
             // 登录按钮
             loginBtn.addEventListener('click', () => {
