@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Livreurs · Admin版</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>Livreurs · 本地版</title>
     <style>
         * {
             box-sizing: border-box;
@@ -288,15 +287,10 @@
             border-radius: 30px;
             margin: 10px 0;
         }
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #2f6d9e;
-        }
     </style>
 </head>
 <body>
-    <!-- 登录/注册界面 -->
+    <!-- 登录/注册界面 - 没有预设密码显示 -->
     <div class="login-overlay" id="loginOverlay" style="position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:1000;">
         <div class="login-box">
             <h2 id="loginTitle">🔐 Connexion</h2>
@@ -316,15 +310,6 @@
                 <input type="password" class="login-input" id="regConfirm" placeholder="Confirmer mot de passe">
                 <button class="login-btn" id="registerBtn">S'inscrire</button>
                 <div class="register-link" id="showLogin">Retour à la connexion</div>
-            </div>
-
-            <!-- 固定账号提示 -->
-            <div style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 20px;">
-                <p style="color: #2e7d32; font-weight: bold;">📝 固定账号：</p>
-                <p>👤 admin / 1234 (管理员)</p>
-                <p>👤 tayfun / 1909</p>
-                <p>👤 xuefeng / 1998</p>
-                <p>👤 steve / 94</p>
             </div>
         </div>
     </div>
@@ -386,7 +371,6 @@
 
         <!-- 顾客列表 -->
         <h3>📋 Liste des clients</h3>
-        <div id="loadingMessage" class="loading" style="display: none;">Chargement...</div>
         <ul class="customer-list" id="customerList"></ul>
 
         <!-- 路线规划 -->
@@ -400,13 +384,7 @@
 
     <script>
         (function() {
-            // Supabase配置（用您的）
-            const supabase = window.supabase.createClient(
-                'https://jmywqokewgnnypqugqev.supabase.co',
-                'sb_publishable_XXkyyl1z7V7D3w1x1sfppA_OPDEFkig'
-            );
-
-            // 固定用户（包含管理员）
+            // 固定用户（硬编码）
             const FIXED_USERS = {
                 'admin': '1234',
                 'tayfun': '1909',
@@ -414,12 +392,47 @@
                 'steve': '94'
             };
 
+            // 本地存储键
+            const STORAGE_KEY = 'livreur_customers';
+            const USERS_KEY = 'livreur_users';
+
+            // 初始化本地存储
+            function initStorage() {
+                if (!localStorage.getItem(STORAGE_KEY)) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+                }
+                if (!localStorage.getItem(USERS_KEY)) {
+                    localStorage.setItem(USERS_KEY, JSON.stringify({}));
+                }
+            }
+            initStorage();
+
+            // 获取所有顾客
+            function getAllCustomers() {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            }
+
+            // 保存顾客
+            function saveCustomers(customers) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+            }
+
+            // 获取所有用户（包含注册用户）
+            function getAllUsers() {
+                const registered = JSON.parse(localStorage.getItem(USERS_KEY)) || {};
+                return { ...FIXED_USERS, ...registered };
+            }
+
+            // 保存注册用户
+            function saveRegisteredUsers(users) {
+                localStorage.setItem(USERS_KEY, JSON.stringify(users));
+            }
+
             let currentUser = null;
             let viewingUser = null;
             let currentDriver = 'Edwin';
             let inputDate = new Date().toISOString().split('T')[0];
             let viewDate = new Date().toISOString().split('T')[0];
-            let allUsers = Object.keys(FIXED_USERS);
 
             // DOM元素
             const loginOverlay = document.getElementById('loginOverlay');
@@ -447,7 +460,6 @@
             const inputDatePicker = document.getElementById('inputDate');
             const viewDatePicker = document.getElementById('viewDate');
             const customerListEl = document.getElementById('customerList');
-            const loadingMessage = document.getElementById('loadingMessage');
             const optimizeBtn = document.getElementById('optimizeRouteBtn');
             const routeOutputDiv = document.getElementById('routeOutput');
             const routeStepsList = document.getElementById('routeStepsList');
@@ -483,14 +495,13 @@
             if (timeType) timeType.addEventListener('change', renderTimeInput);
 
             // 登录
-            async function login(username, password) {
-                // 检查固定用户
-                if (FIXED_USERS[username] && FIXED_USERS[username] === password) {
+            function login(username, password) {
+                const users = getAllUsers();
+                if (users[username] && users[username] === password) {
                     currentUser = username;
                     viewingUser = username;
                     currentUserDisplay.innerText = `👤 ${currentUser}`;
                     
-                    // 如果是管理员，显示管理员区域
                     if (username === 'admin') {
                         userRole.innerText = ' (管理员)';
                         adminSection.style.display = 'block';
@@ -507,89 +518,32 @@
                     
                     renderUserSelector();
                     renderDriverTabs();
-                    await loadCustomers();
+                    renderCustomerList();
                     updateInputSectionState();
                     updateHints();
                     return true;
                 }
-                
-                // 检查注册用户（从数据库）
-                try {
-                    const { data, error } = await supabase
-                        .from('users')
-                        .select('*')
-                        .eq('username', username)
-                        .eq('password', password)
-                        .single();
-                    
-                    if (data) {
-                        currentUser = username;
-                        viewingUser = username;
-                        currentUserDisplay.innerText = `👤 ${currentUser}`;
-                        userRole.innerText = '';
-                        adminSection.style.display = 'none';
-                        
-                        loginOverlay.style.display = 'none';
-                        appContainer.style.display = 'block';
-                        
-                        currentDriver = 'Edwin';
-                        
-                        renderUserSelector();
-                        renderDriverTabs();
-                        await loadCustomers();
-                        updateInputSectionState();
-                        updateHints();
-                        return true;
-                    }
-                } catch (e) {
-                    console.log('数据库用户不存在');
-                }
-                
                 return false;
             }
 
             // 注册
-            async function register(username, password) {
-                // 检查是否已存在
-                if (FIXED_USERS[username]) {
+            function register(username, password) {
+                const users = getAllUsers();
+                if (users[username]) {
                     alert('用户名已存在');
                     return false;
                 }
                 
-                try {
-                    // 检查数据库
-                    const { data: existing } = await supabase
-                        .from('users')
-                        .select('*')
-                        .eq('username', username);
-                    
-                    if (existing && existing.length > 0) {
-                        alert('用户名已存在');
-                        return false;
-                    }
-                    
-                    // 插入新用户
-                    const { error } = await supabase
-                        .from('users')
-                        .insert([{
-                            username: username,
-                            password: password,
-                            created_at: new Date().toISOString()
-                        }]);
-                    
-                    if (error) throw error;
-                    
-                    alert('注册成功，请登录');
-                    return true;
-                } catch (error) {
-                    console.error('注册失败:', error);
-                    alert('注册失败');
-                    return false;
-                }
+                const registered = JSON.parse(localStorage.getItem(USERS_KEY)) || {};
+                registered[username] = password;
+                saveRegisteredUsers(registered);
+                
+                alert('注册成功，请登录');
+                return true;
             }
 
             // 管理员删除用户
-            window.removeUser = async function(username) {
+            window.removeUser = function(username) {
                 if (currentUser !== 'admin') return;
                 
                 if (username === 'admin') {
@@ -598,97 +552,74 @@
                 }
                 
                 if (confirm(`确定删除用户 ${username} 吗？`)) {
-                    try {
-                        // 删除用户的顾客数据
-                        await supabase
-                            .from('customers')
-                            .delete()
-                            .eq('username', username);
-                        
-                        // 删除用户
-                        await supabase
-                            .from('users')
-                            .delete()
-                            .eq('username', username);
-                        
-                        renderUserList();
-                        renderUserSelector();
-                    } catch (error) {
-                        console.error('删除失败:', error);
+                    // 从固定用户中删除？
+                    if (FIXED_USERS[username]) {
+                        alert('不能删除固定用户');
+                        return;
                     }
+                    
+                    // 从注册用户中删除
+                    const registered = JSON.parse(localStorage.getItem(USERS_KEY)) || {};
+                    delete registered[username];
+                    saveRegisteredUsers(registered);
+                    
+                    // 删除该用户的所有顾客数据
+                    const allCustomers = getAllCustomers();
+                    const filtered = allCustomers.filter(c => c.username !== username);
+                    saveCustomers(filtered);
+                    
+                    renderUserList();
+                    renderUserSelector();
+                    renderCustomerList();
                 }
             };
 
             // 渲染用户列表（管理员）
-            async function renderUserList() {
+            function renderUserList() {
                 if (currentUser !== 'admin') return;
                 
-                try {
-                    // 获取注册用户
-                    const { data: registered } = await supabase
-                        .from('users')
-                        .select('username');
-                    
-                    // 合并固定用户和注册用户
-                    const allUsernames = [
-                        ...Object.keys(FIXED_USERS).filter(u => u !== 'admin'),
-                        ...(registered || []).map(u => u.username)
-                    ];
-                    
-                    let html = '';
-                    allUsernames.forEach(username => {
-                        html += `
-                            <div class="user-tag">
-                                👤 ${username}
-                                <span class="remove-user" onclick="removeUser('${username}')">✕</span>
-                            </div>
-                        `;
-                    });
-                    
-                    userList.innerHTML = html || '<p>暂无其他用户</p>';
-                } catch (error) {
-                    console.error('加载用户失败:', error);
-                }
+                const users = getAllUsers();
+                let html = '';
+                
+                Object.keys(users).forEach(username => {
+                    if (username === 'admin') return;
+                    html += `
+                        <div class="user-tag">
+                            👤 ${username} ${FIXED_USERS[username] ? '(固定)' : ''}
+                            ${!FIXED_USERS[username] ? '<span class="remove-user" onclick="removeUser(\'' + username + '\')">✕</span>' : ''}
+                        </div>
+                    `;
+                });
+                
+                userList.innerHTML = html || '<p>暂无其他用户</p>';
             }
 
             // 渲染用户选择器
-            async function renderUserSelector() {
-                try {
-                    // 获取注册用户
-                    const { data: registered } = await supabase
-                        .from('users')
-                        .select('username');
-                    
-                    // 合并固定用户（不包括admin）
-                    const allUsernames = [
-                        ...Object.keys(FIXED_USERS).filter(u => u !== 'admin'),
-                        ...(registered || []).map(u => u.username)
-                    ];
-                    
-                    let html = '';
-                    allUsernames.forEach(username => {
-                        const activeClass = (viewingUser === username) ? 'active' : '';
-                        const ownClass = (username === currentUser) ? 'own' : '';
-                        const label = username === currentUser ? `${username} (moi)` : username;
-                        html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${username}">👤 ${label}</button>`;
-                    });
-                    
-                    userSelectorButtons.innerHTML = html;
+            function renderUserSelector() {
+                const users = getAllUsers();
+                let html = '';
+                
+                Object.keys(users).forEach(username => {
+                    if (username === 'admin') return;
+                    const activeClass = (viewingUser === username) ? 'active' : '';
+                    const ownClass = (username === currentUser) ? 'own' : '';
+                    const label = username === currentUser ? `${username} (moi)` : username;
+                    html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${username}">👤 ${label}</button>`;
+                });
+                
+                userSelectorButtons.innerHTML = html;
 
-                    document.querySelectorAll('.user-button').forEach(btn => {
-                        btn.addEventListener('click', () => {
-                            viewingUser = btn.dataset.user;
-                            renderUserSelector();
-                            renderDriverTabs();
-                            loadCustomers();
-                            updateInputSectionState();
-                            updateHints();
-                            routeOutputDiv.style.display = 'none';
-                        });
+                document.querySelectorAll('.user-button').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        viewingUser = btn.dataset.user;
+                        renderUserSelector();
+                        renderDriverTabs();
+                        renderCustomerList();
+                        updateInputSectionState();
+                        updateHints();
+                        routeOutputDiv.style.display = 'none';
                     });
-                } catch (error) {
-                    console.error('加载用户失败:', error);
-                }
+                });
             }
 
             // 更新录入区域状态
@@ -714,7 +645,7 @@
                     tab.addEventListener('click', () => {
                         currentDriver = tab.dataset.driver;
                         renderDriverTabs();
-                        loadCustomers();
+                        renderCustomerList();
                         updateHints();
                         routeOutputDiv.style.display = 'none';
                     });
@@ -738,90 +669,10 @@
             if (viewDatePicker) {
                 viewDatePicker.addEventListener('change', (e) => {
                     viewDate = e.target.value;
-                    loadCustomers();
+                    renderCustomerList();
                     routeOutputDiv.style.display = 'none';
                     updateHints();
                 });
-            }
-
-            // 加载顾客
-            async function loadCustomers() {
-                try {
-                    loadingMessage.style.display = 'block';
-                    
-                    const { data, error } = await supabase
-                        .from('customers')
-                        .select('*')
-                        .eq('username', viewingUser)
-                        .eq('driver', currentDriver)
-                        .eq('date', viewDate)
-                        .order('added_time', { ascending: false });
-                    
-                    if (error) throw error;
-                    
-                    renderCustomerList(data || []);
-                } catch (error) {
-                    console.error('加载失败:', error);
-                } finally {
-                    loadingMessage.style.display = 'none';
-                }
-            }
-
-            // 保存顾客
-            async function saveCustomer(customer) {
-                try {
-                    const { error } = await supabase
-                        .from('customers')
-                        .insert([{
-                            username: currentUser,
-                            driver: currentDriver,
-                            date: inputDate,
-                            customer_name: customer.name,
-                            customer_address: customer.address,
-                            time_req: customer.timeReq,
-                            added_time: customer.addedTime,
-                            added_by: customer.addedBy,
-                            departed: customer.departed,
-                            departure_time: customer.departureTime,
-                            departed_by: customer.departedBy
-                        }]);
-                    
-                    if (error) throw error;
-                } catch (error) {
-                    console.error('保存失败:', error);
-                    throw error;
-                }
-            }
-
-            // 更新顾客
-            async function updateCustomer(customerId, updates) {
-                try {
-                    const { error } = await supabase
-                        .from('customers')
-                        .update(updates)
-                        .eq('id', customerId);
-                    
-                    if (error) throw error;
-                } catch (error) {
-                    console.error('更新失败:', error);
-                    throw error;
-                }
-            }
-
-            // 删除顾客
-            async function deleteCustomerFromCloud(customerId) {
-                try {
-                    const { error } = await supabase
-                        .from('customers')
-                        .delete()
-                        .eq('id', customerId)
-                        .eq('username', currentUser);
-                    
-                    if (error) throw error;
-                } catch (error) {
-                    console.error('删除失败:', error);
-                    throw error;
-                }
             }
 
             // 获取时间值
@@ -860,7 +711,7 @@
             }
 
             // 添加顾客
-            addBtn.addEventListener('click', async () => {
+            addBtn.addEventListener('click', () => {
                 if (viewingUser !== currentUser) {
                     alert('Vous ne pouvez ajouter que dans vos propres données');
                     return;
@@ -876,79 +727,79 @@
                 const timeReq = getTimeValue();
                 const now = Date.now();
                 const newCustomer = {
-                    name: name,
-                    address: addr,
-                    timeReq: timeReq,
-                    addedTime: now,
-                    addedBy: currentUser,
+                    id: now + '-' + Math.random().toString(36),
+                    username: currentUser,
+                    driver: currentDriver,
+                    date: inputDate,
+                    customer_name: name,
+                    customer_address: addr,
+                    time_req: timeReq,
+                    added_time: now,
+                    added_by: currentUser,
                     departed: false,
-                    departureTime: null,
-                    departedBy: null
+                    departure_time: null,
+                    departed_by: null
                 };
 
-                try {
-                    loadingMessage.style.display = 'block';
-                    await saveCustomer(newCustomer);
-                    
-                    nameInput.value = '';
-                    addrInput.value = '';
+                const allCustomers = getAllCustomers();
+                allCustomers.push(newCustomer);
+                saveCustomers(allCustomers);
 
-                    if (viewDate === inputDate && viewingUser === currentUser) {
-                        await loadCustomers();
-                    }
-                    routeOutputDiv.style.display = 'none';
-                } catch (error) {
-                    alert('Erreur: ' + error.message);
-                } finally {
-                    loadingMessage.style.display = 'none';
+                nameInput.value = '';
+                addrInput.value = '';
+
+                if (viewDate === inputDate && viewingUser === currentUser) {
+                    renderCustomerList();
                 }
+                routeOutputDiv.style.display = 'none';
             });
 
             // 删除顾客
-            async function deleteCustomer(custId) {
+            function deleteCustomer(custId) {
                 if (viewingUser !== currentUser) {
                     alert('Vous ne pouvez pas supprimer les données d\'autres utilisateurs');
                     return;
                 }
 
-                try {
-                    loadingMessage.style.display = 'block';
-                    await deleteCustomerFromCloud(custId);
-                    await loadCustomers();
-                    routeOutputDiv.style.display = 'none';
-                } catch (error) {
-                    alert('Erreur: ' + error.message);
-                } finally {
-                    loadingMessage.style.display = 'none';
+                const allCustomers = getAllCustomers();
+                const filtered = allCustomers.filter(c => c.id !== custId);
+                saveCustomers(filtered);
+                
+                if (viewingUser === currentUser) {
+                    renderCustomerList();
                 }
+                routeOutputDiv.style.display = 'none';
             }
 
             // 标记出发
-            async function markCustomerDeparted(custId) {
-                try {
-                    loadingMessage.style.display = 'block';
-                    await updateCustomer(custId, {
-                        departed: true,
-                        departure_time: Date.now(),
-                        departed_by: currentUser
-                    });
-                    await loadCustomers();
-                } catch (error) {
-                    alert('Erreur: ' + error.message);
-                } finally {
-                    loadingMessage.style.display = 'none';
+            function markCustomerDeparted(custId) {
+                const allCustomers = getAllCustomers();
+                const customer = allCustomers.find(c => c.id === custId);
+                if (customer && !customer.departed) {
+                    customer.departed = true;
+                    customer.departure_time = Date.now();
+                    customer.departed_by = currentUser;
+                    saveCustomers(allCustomers);
+                    renderCustomerList();
                 }
             }
 
             // 渲染顾客列表
-            function renderCustomerList(customers) {
+            function renderCustomerList() {
+                const allCustomers = getAllCustomers();
+                const filtered = allCustomers.filter(c => 
+                    c.username === viewingUser && 
+                    c.driver === currentDriver && 
+                    c.date === viewDate
+                ).sort((a,b) => b.added_time - a.added_time);
+                
                 const isOwnData = (viewingUser === currentUser);
 
                 let html = '';
-                if (customers.length === 0) {
+                if (filtered.length === 0) {
                     html = '<li style="padding:30px; text-align:center; color:#8899bb;">Aucun client</li>';
                 } else {
-                    customers.forEach(c => {
+                    filtered.forEach(c => {
                         const timeDisplay = formatTimeRequirement(c);
                         const addedDisplay = formatAddedTime(c.added_time);
                         const departedClass = c.departed ? 'departed' : '';
@@ -1010,59 +861,49 @@
             }
 
             // 路线规划
-            optimizeBtn.addEventListener('click', async () => {
-                try {
-                    loadingMessage.style.display = 'block';
-                    
-                    const { data } = await supabase
-                        .from('customers')
-                        .select('*')
-                        .eq('username', viewingUser)
-                        .eq('driver', currentDriver)
-                        .eq('date', viewDate)
-                        .eq('departed', false);
-                    
-                    const pending = data || [];
-                    
-                    if (pending.length === 0) {
-                        alert('Aucun client en attente');
-                        return;
-                    }
-
-                    const optimized = pending.sort((a,b) => {
-                        const getTime = (c) => {
-                            if (c.time_req?.type === 'fixed') return c.time_req.value;
-                            return '23:59';
-                        };
-                        return (getTime(a) || '23:59').localeCompare(getTime(b) || '23:59');
-                    });
-
-                    let stepsHtml = '';
-                    optimized.forEach((c, idx) => {
-                        stepsHtml += `
-                            <li>
-                                <span style="background:#f09b4b; color:white; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%;">${idx+1}</span>
-                                <strong>${escapeHtml(c.customer_name)}</strong> - ${escapeHtml(c.customer_address)}
-                                <span style="background:#ffe6c0; padding:2px 8px; border-radius:20px;">${formatTimeRequirement(c)}</span>
-                                <span style="background:#e6d5b8; padding:2px 8px; border-radius:20px;">👤 ${escapeHtml(c.added_by)}</span>
-                            </li>
-                        `;
-                    });
-                    routeStepsList.innerHTML = stepsHtml;
-                    routeNote.innerText = '* Optimisé selon les horaires';
-                    routeOutputDiv.style.display = 'block';
-                } catch (error) {
-                    console.error('规划失败:', error);
-                } finally {
-                    loadingMessage.style.display = 'none';
+            optimizeBtn.addEventListener('click', () => {
+                const allCustomers = getAllCustomers();
+                const pending = allCustomers.filter(c => 
+                    c.username === viewingUser && 
+                    c.driver === currentDriver && 
+                    c.date === viewDate &&
+                    !c.departed
+                );
+                
+                if (pending.length === 0) {
+                    alert('Aucun client en attente');
+                    return;
                 }
+
+                const optimized = pending.sort((a,b) => {
+                    const getTime = (c) => {
+                        if (c.time_req?.type === 'fixed') return c.time_req.value;
+                        return '23:59';
+                    };
+                    return (getTime(a) || '23:59').localeCompare(getTime(b) || '23:59');
+                });
+
+                let stepsHtml = '';
+                optimized.forEach((c, idx) => {
+                    stepsHtml += `
+                        <li>
+                            <span style="background:#f09b4b; color:white; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%;">${idx+1}</span>
+                            <strong>${escapeHtml(c.customer_name)}</strong> - ${escapeHtml(c.customer_address)}
+                            <span style="background:#ffe6c0; padding:2px 8px; border-radius:20px;">${formatTimeRequirement(c)}</span>
+                            <span style="background:#e6d5b8; padding:2px 8px; border-radius:20px;">👤 ${escapeHtml(c.added_by)}</span>
+                        </li>
+                    `;
+                });
+                routeStepsList.innerHTML = stepsHtml;
+                routeNote.innerText = '* Optimisé selon les horaires';
+                routeOutputDiv.style.display = 'block';
             });
 
             // 登录按钮
-            loginBtn.addEventListener('click', async () => {
+            loginBtn.addEventListener('click', () => {
                 const username = loginUsername.value.trim();
                 const password = loginPassword.value.trim();
-                const success = await login(username, password);
+                const success = login(username, password);
                 if (!success) {
                     alert('Nom d\'utilisateur ou mot de passe incorrect');
                 }
@@ -1087,7 +928,7 @@
             });
 
             // 注册按钮
-            registerBtn.addEventListener('click', async () => {
+            registerBtn.addEventListener('click', () => {
                 const username = regUsername.value.trim();
                 const password = regPassword.value.trim();
                 const confirm = regConfirm.value.trim();
@@ -1101,7 +942,7 @@
                     return;
                 }
                 
-                const success = await register(username, password);
+                const success = register(username, password);
                 if (success) {
                     registerForm.style.display = 'none';
                     loginForm.style.display = 'block';
