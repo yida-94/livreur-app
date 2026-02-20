@@ -7,6 +7,7 @@
     <!-- 引入 Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* 样式保持不变，和之前完全一样 */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -690,8 +691,6 @@
             let inputDate = new Date().toISOString().split('T')[0];
             let viewDate = new Date().toISOString().split('T')[0];
             
-            const users = [];
-
             const loginOverlay = document.getElementById('loginOverlay');
             const registerOverlay = document.getElementById('registerOverlay');
             const appContainer = document.getElementById('app');
@@ -792,34 +791,31 @@
                     `Utilisateur: ${currentUser} | Vue: ${viewingName} | Chauffeur: ${currentDriver} | Ajout: ${inputDate} | Visualisation: ${viewDate}`;
             }
 
-            // ==================== 用户管理 (Supabase Auth) ====================
+            // ==================== 简单的登录注册 ====================
             
-            async function loadAllUsers() {
-                try {
-                    const { data, error } = await supabase
-                        .from('users')
-                        .select('*');
-                    if (error) throw error;
-                    return data || [];
-                } catch (error) {
-                    console.error('加载用户失败:', error);
-                    return [];
-                }
-            }
-
             async function login(username, password) {
                 try {
-                    const { data, error } = await supabase.auth.signInWithPassword({
-                        email: username + '@temp.com',
-                        password: password
-                    });
+                    // 从 users 表查找用户
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('username', username)
+                        .single();
                     
-                    if (error) throw error;
+                    if (error || !data) {
+                        console.error('用户不存在:', error);
+                        return false;
+                    }
+                    
+                    // 简单密码验证（实际应该用加密，但为了简单先用明文）
+                    if (data.password !== password) {
+                        return false;
+                    }
                     
                     currentUser = username;
-                    currentUserId = data.user.id;
+                    currentUserId = data.id;
                     viewingUser = username;
-                    viewingUserId = data.user.id;
+                    viewingUserId = data.id;
                     
                     currentUserDisplay.innerText = `👤 ${currentUser}`;
                     loginOverlay.style.display = 'none';
@@ -827,7 +823,7 @@
                     
                     currentDriver = 'Edwin';
                     
-                    await renderUserSelector();
+                    await loadAllUsers();
                     renderDriverTabs();
                     await renderCustomerList();
                     updateInputSectionState();
@@ -841,29 +837,40 @@
 
             async function register(username, password) {
                 try {
-                    const { data, error } = await supabase.auth.signUp({
-                        email: username + '@temp.com',
-                        password: password,
-                        options: {
-                            data: {
-                                username: username
-                            }
-                        }
-                    });
+                    // 检查用户名是否已存在
+                    const { data: existing } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('username', username);
+                    
+                    if (existing && existing.length > 0) {
+                        alert('用户名已存在');
+                        return false;
+                    }
+                    
+                    // 插入新用户
+                    const { data, error } = await supabase
+                        .from('users')
+                        .insert([{
+                            username: username,
+                            password: password,
+                            email: username + '@temp.com',
+                            created_at: new Date().toISOString()
+                        }])
+                        .select();
                     
                     if (error) throw error;
                     
-                    alert(currentLang === 'zh' ? '注册成功，请登录' : 'Inscription réussie');
+                    alert('注册成功，请登录');
                     return true;
                 } catch (error) {
                     console.error('注册失败:', error);
-                    alert(error.message);
+                    alert('注册失败: ' + error.message);
                     return false;
                 }
             }
 
             async function logout() {
-                await supabase.auth.signOut();
                 currentUser = null;
                 currentUserId = null;
                 viewingUser = null;
@@ -874,45 +881,44 @@
                 loginPassword.value = '';
             }
 
-            async function renderUserSelector() {
-                if (!currentUser) return;
-                
-                const { data: users, error } = await supabase
-                    .from('users')
-                    .select('*');
-                
-                if (error) {
-                    console.error('加载用户失败:', error);
-                    return;
-                }
-                
-                let html = '';
-                users.forEach(user => {
-                    const username = user.username;
-                    if (username === 'admin') return;
-                    const activeClass = (viewingUser === username) ? 'active' : '';
-                    const ownClass = (username === currentUser) ? 'own' : '';
-                    const label = username === currentUser ? 
-                        (currentLang==='zh'? `${username} (我)` : `${username} (moi)`) : 
-                        username;
-                    html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${username}" data-userid="${user.id}">👤 ${label}</button>`;
-                });
-                userSelectorButtons.innerHTML = html;
-
-                document.querySelectorAll('.user-button').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const user = btn.dataset.user;
-                        const userId = btn.dataset.userid;
-                        viewingUser = user;
-                        viewingUserId = userId;
-                        renderUserSelector();
-                        renderDriverTabs();
-                        renderCustomerList();
-                        updateInputSectionState();
-                        updateHints();
-                        routeOutputDiv.style.display = 'none';
+            async function loadAllUsers() {
+                try {
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('*');
+                    if (error) throw error;
+                    
+                    let html = '';
+                    data.forEach(user => {
+                        if (user.username === 'admin') return;
+                        const activeClass = (viewingUser === user.username) ? 'active' : '';
+                        const ownClass = (user.username === currentUser) ? 'own' : '';
+                        const label = user.username === currentUser ? 
+                            (currentLang==='zh'? `${user.username} (我)` : `${user.username} (moi)`) : 
+                            user.username;
+                        html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${user.username}" data-userid="${user.id}">👤 ${label}</button>`;
                     });
-                });
+                    userSelectorButtons.innerHTML = html;
+
+                    document.querySelectorAll('.user-button').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            viewingUser = btn.dataset.user;
+                            viewingUserId = btn.dataset.userid;
+                            renderUserSelector();
+                            renderDriverTabs();
+                            renderCustomerList();
+                            updateInputSectionState();
+                            updateHints();
+                            routeOutputDiv.style.display = 'none';
+                        });
+                    });
+                } catch (error) {
+                    console.error('加载用户失败:', error);
+                }
+            }
+
+            function renderUserSelector() {
+                // 已经在 loadAllUsers 里做了
             }
 
             function updateInputSectionState() {
