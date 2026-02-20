@@ -234,12 +234,19 @@
             gap: 15px;
             flex-wrap: wrap;
             margin-top: 10px;
+            font-size: 0.8rem;
         }
         .time-badge {
             background: #ddeeff;
             padding: 4px 12px;
             border-radius: 30px;
             font-size: 0.75rem;
+        }
+        .added-time {
+            background: #e1f5fe;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 0.7rem;
         }
         .added-by {
             background: #e6d5b8;
@@ -707,7 +714,12 @@
             function formatAddedTime(timestamp) {
                 if (!timestamp) return '';
                 const date = new Date(timestamp);
-                return date.toLocaleTimeString();
+                return date.toLocaleString('fr-FR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
             }
 
             // 添加顾客
@@ -818,7 +830,8 @@
                                 <div>📍 ${escapeHtml(c.customer_address)}</div>
                                 <div class="meta-row">
                                     <span class="time-badge">${timeDisplay}</span>
-                                    <span class="added-by">👤 Ajouté par: ${escapeHtml(c.added_by || 'unknown')}</span>
+                                    <span class="added-time">📌 ${addedDisplay}</span>
+                                    <span class="added-by">👤 ${escapeHtml(c.added_by || 'unknown')}</span>
                                     ${validatedInfo}
                                 </div>
                                 ${departedInfo}
