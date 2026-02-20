@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Livreurs · Supabase</title>
+    <title>Livreurs · Supabase Auth</title>
     <!-- 引入 Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -32,7 +32,6 @@
             border: 1px solid rgba(255,255,255,0.6);
         }
 
-        /* Login modal */
         .login-overlay {
             position: fixed;
             top: 0;
@@ -91,63 +90,6 @@
             cursor: pointer;
         }
 
-        /* Admin section */
-        .user-section {
-            background: #f0f7ff;
-            border-radius: 30px;
-            padding: 16px;
-            margin-bottom: 20px;
-            border: 1px solid #c1d9f0;
-            display: none;
-        }
-        .user-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        .user-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        .user-tag {
-            background: white;
-            border: 2px solid #b0c8e5;
-            border-radius: 40px;
-            padding: 8px 18px;
-            font-weight: 600;
-            color: #1f4a7a;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .add-user-form {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .add-user-form input {
-            flex: 1;
-            padding: 12px 18px;
-            border: 2px solid #b9cfe6;
-            border-radius: 40px;
-            font-size: 0.95rem;
-            outline: none;
-        }
-        .btn-add-user {
-            background: #2f6d9e;
-            border: none;
-            color: white;
-            padding: 0 25px;
-            border-radius: 40px;
-            font-weight: 600;
-            cursor: pointer;
-            border-bottom: 3px solid #123d5c;
-        }
-
-        /* User info bar */
         .user-info-bar {
             background: #d4e3fd;
             border-radius: 40px;
@@ -168,7 +110,6 @@
             border-bottom: 3px solid #923e3e;
         }
 
-        /* User selector */
         .user-selector {
             background: #f5faff;
             border-radius: 30px;
@@ -206,7 +147,6 @@
             background: #e8f5e9;
         }
 
-        /* Date selection */
         .dual-date-section {
             display: flex;
             gap: 20px;
@@ -239,7 +179,6 @@
             background: white;
         }
 
-        /* Driver tabs */
         .driver-tabs {
             display: flex;
             gap: 8px;
@@ -272,7 +211,6 @@
             color: #003153;
         }
 
-        /* Language toggle */
         .lang-row {
             display: flex;
             justify-content: flex-end;
@@ -294,7 +232,6 @@
             color: white;
         }
 
-        /* Input section */
         .input-section {
             background: #f5faff;
             border-radius: 30px;
@@ -374,7 +311,6 @@
             font-size: 1rem;
         }
 
-        /* Customer list */
         .list-header {
             display: flex;
             justify-content: space-between;
@@ -523,7 +459,6 @@
             font-weight: 600;
         }
 
-        /* Route planning */
         .action-panel {
             background: #eaf1fa;
             border-radius: 30px;
@@ -609,7 +544,6 @@
     </style>
 </head>
 <body>
-    <!-- Login modal -->
     <div class="login-overlay" id="loginOverlay">
         <div class="login-box">
             <h2 id="loginTitle">🔐 Connexion</h2>
@@ -620,7 +554,6 @@
         </div>
     </div>
 
-    <!-- Register modal -->
     <div class="login-overlay" id="registerOverlay" style="display: none;">
         <div class="login-box">
             <h2>📝 Inscription</h2>
@@ -633,33 +566,16 @@
     </div>
 
     <div class="app-container" id="app" style="display: none;">
-        <!-- Language toggle -->
         <div class="lang-row">
             <button class="lang-btn" id="btnLangZh">🇨🇳 中文</button>
             <button class="lang-btn active" id="btnLangFr">🇫🇷 Français</button>
         </div>
 
-        <!-- User info bar -->
         <div class="user-info-bar" id="userInfoBar">
             <span id="currentUserDisplay">👤 Non connecté</span>
             <button class="logout-btn" id="logoutBtn">Déconnexion</button>
         </div>
 
-        <!-- Admin section -->
-        <div class="user-section" id="adminSection">
-            <div class="user-header">
-                <h3 class="zh" style="display:none;">👥 使用者管理 (管理员)</h3>
-                <h3 class="fr">👥 Gestion (Admin)</h3>
-            </div>
-            <div class="user-list" id="userList"></div>
-            <div class="add-user-form">
-                <input type="text" id="newUserName" placeholder="Nouvel utilisateur">
-                <input type="password" id="newUserPassword" placeholder="Mot de passe">
-                <button class="btn-add-user" id="addUserBtn">➕</button>
-            </div>
-        </div>
-
-        <!-- User selector -->
         <div class="user-selector">
             <div class="selector-label">
                 <span class="zh" style="display:none;">👁️ 查看其他使用者数据</span>
@@ -668,7 +584,6 @@
             <div class="user-buttons" id="userSelectorButtons"></div>
         </div>
 
-        <!-- Dual date selection -->
         <div class="dual-date-section">
             <div class="date-card">
                 <div class="label">
@@ -688,13 +603,10 @@
             </div>
         </div>
 
-        <!-- Driver tabs -->
         <div class="driver-tabs" id="driverTabs"></div>
 
-        <!-- Current view info -->
         <div class="current-view-badge" id="currentViewHint"></div>
 
-        <!-- Input section -->
         <div class="input-section" id="inputSection">
             <div class="section-title">
                 <span>📝</span>
@@ -731,7 +643,6 @@
             </div>
         </div>
 
-        <!-- Customer list -->
         <div class="list-header">
             <h3>
                 <span class="zh" style="display:none;">📋 顾客列表</span>
@@ -743,7 +654,6 @@
         <div id="loadingMessage" class="loading" style="display: none;">Chargement...</div>
         <ul class="customer-list" id="customerList"></ul>
 
-        <!-- Route planning -->
         <div class="action-panel">
             <button class="optimize-btn" id="optimizeRouteBtn">
                 <span>🗺️</span>
@@ -766,26 +676,22 @@
     <script>
         (function() {
             // ==================== 配置 Supabase ====================
-            // 已经替换成您的信息
             const SUPABASE_URL = 'https://jmywqokewgnnypqugqev.supabase.co';
             const SUPABASE_KEY = 'sb_publishable_XXkyyl1z7V7D3w1x1sfppA_OPDEFkig';
             
-            // 初始化 Supabase 客户端
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             
-            // ==================== 全局状态 ====================
             let currentLang = 'fr';
             let currentUser = null;
+            let currentUserId = null;
             let viewingUser = null;
+            let viewingUserId = null;
             let currentDriver = 'Edwin';
             let inputDate = new Date().toISOString().split('T')[0];
             let viewDate = new Date().toISOString().split('T')[0];
             
-            // 用户数据存在 Supabase 的 auth 表里
-            // 我们自己维护一个简单的用户列表
-            const users = ['admin', 'demo1', 'demo2']; // 演示用，实际可以从数据库加载
-            
-            // DOM 元素
+            const users = [];
+
             const loginOverlay = document.getElementById('loginOverlay');
             const registerOverlay = document.getElementById('registerOverlay');
             const appContainer = document.getElementById('app');
@@ -800,14 +706,9 @@
             const registerBtn = document.getElementById('registerBtn');
             const logoutBtn = document.getElementById('logoutBtn');
             const currentUserDisplay = document.getElementById('currentUserDisplay');
-            const adminSection = document.getElementById('adminSection');
             const userSelectorButtons = document.getElementById('userSelectorButtons');
             const inputSection = document.getElementById('inputSection');
             
-            const userListEl = document.getElementById('userList');
-            const newUserName = document.getElementById('newUserName');
-            const newUserPassword = document.getElementById('newUserPassword');
-            const addUserBtn = document.getElementById('addUserBtn');
             const driverTabsEl = document.getElementById('driverTabs');
             const currentViewHint = document.getElementById('currentViewHint');
             const inputDatePicker = document.getElementById('inputDate');
@@ -828,13 +729,11 @@
             const timeInputContainer = document.getElementById('timeInputContainer');
             const addBtn = document.getElementById('addCustomerBtn');
 
-            // 语言按钮
             const btnZh = document.getElementById('btnLangZh');
             const btnFr = document.getElementById('btnLangFr');
             const zhSpans = document.querySelectorAll('.zh');
             const frSpans = document.querySelectorAll('.fr');
 
-            // 设置默认日期
             function setDefaultDates() {
                 const today = new Date().toISOString().split('T')[0];
                 inputDatePicker.value = today;
@@ -843,7 +742,6 @@
                 viewDate = today;
             }
 
-            // 渲染时间输入框
             function renderTimeInput() {
                 const type = timeType.value;
                 let html = '';
@@ -860,7 +758,6 @@
             }
             timeType.addEventListener('change', renderTimeInput);
 
-            // 语言切换
             function setLanguage(lang) {
                 currentLang = lang;
                 if (lang === 'zh') {
@@ -884,7 +781,6 @@
             btnZh.addEventListener('click', () => setLanguage('zh'));
             btnFr.addEventListener('click', () => setLanguage('fr'));
 
-            // 更新提示信息
             function updateHints() {
                 inputDateHint.innerText = `${currentLang==='zh'?'录入日期':'Date d\'ajout'}: ${inputDate}`;
                 viewDateHint.innerText = `${currentLang==='zh'?'查看日期':'Date visualisée'}: ${viewDate}`;
@@ -896,62 +792,119 @@
                     `Utilisateur: ${currentUser} | Vue: ${viewingName} | Chauffeur: ${currentDriver} | Ajout: ${inputDate} | Visualisation: ${viewDate}`;
             }
 
-            // ==================== 用户管理 ====================
+            // ==================== 用户管理 (Supabase Auth) ====================
             
-            // 登录
+            async function loadAllUsers() {
+                try {
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('*');
+                    if (error) throw error;
+                    return data || [];
+                } catch (error) {
+                    console.error('加载用户失败:', error);
+                    return [];
+                }
+            }
+
             async function login(username, password) {
                 try {
-                    // 简单演示登录，实际应该用 Supabase Auth
-                    if (password === '123456') { // 简单密码
-                        currentUser = username;
-                        viewingUser = username;
-                        currentUserDisplay.innerText = `👤 ${currentUser}`;
-                        loginOverlay.style.display = 'none';
-                        appContainer.style.display = 'block';
-                        
-                        // 如果是admin，显示管理区域
-                        if (username === 'admin') {
-                            adminSection.style.display = 'block';
-                        } else {
-                            adminSection.style.display = 'none';
-                        }
-                        
-                        currentDriver = 'Edwin';
-                        
-                        renderUserSelector();
-                        renderDriverTabs();
-                        renderCustomerList();
-                        updateInputSectionState();
-                        updateHints();
-                        return true;
-                    }
-                    return false;
+                    const { data, error } = await supabase.auth.signInWithPassword({
+                        email: username + '@temp.com',
+                        password: password
+                    });
+                    
+                    if (error) throw error;
+                    
+                    currentUser = username;
+                    currentUserId = data.user.id;
+                    viewingUser = username;
+                    viewingUserId = data.user.id;
+                    
+                    currentUserDisplay.innerText = `👤 ${currentUser}`;
+                    loginOverlay.style.display = 'none';
+                    appContainer.style.display = 'block';
+                    
+                    currentDriver = 'Edwin';
+                    
+                    await renderUserSelector();
+                    renderDriverTabs();
+                    await renderCustomerList();
+                    updateInputSectionState();
+                    updateHints();
+                    return true;
                 } catch (error) {
                     console.error('登录失败:', error);
                     return false;
                 }
             }
 
-            // 渲染用户选择器
-            function renderUserSelector() {
+            async function register(username, password) {
+                try {
+                    const { data, error } = await supabase.auth.signUp({
+                        email: username + '@temp.com',
+                        password: password,
+                        options: {
+                            data: {
+                                username: username
+                            }
+                        }
+                    });
+                    
+                    if (error) throw error;
+                    
+                    alert(currentLang === 'zh' ? '注册成功，请登录' : 'Inscription réussie');
+                    return true;
+                } catch (error) {
+                    console.error('注册失败:', error);
+                    alert(error.message);
+                    return false;
+                }
+            }
+
+            async function logout() {
+                await supabase.auth.signOut();
+                currentUser = null;
+                currentUserId = null;
+                viewingUser = null;
+                viewingUserId = null;
+                appContainer.style.display = 'none';
+                loginOverlay.style.display = 'flex';
+                loginUsername.value = '';
+                loginPassword.value = '';
+            }
+
+            async function renderUserSelector() {
                 if (!currentUser) return;
+                
+                const { data: users, error } = await supabase
+                    .from('users')
+                    .select('*');
+                
+                if (error) {
+                    console.error('加载用户失败:', error);
+                    return;
+                }
                 
                 let html = '';
                 users.forEach(user => {
-                    if (user === 'admin') return;
-                    const activeClass = (viewingUser === user) ? 'active' : '';
-                    const ownClass = (user === currentUser) ? 'own' : '';
-                    const label = user === currentUser ? 
-                        (currentLang==='zh'? `${user} (我)` : `${user} (moi)`) : 
-                        user;
-                    html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${user}">👤 ${label}</button>`;
+                    const username = user.username;
+                    if (username === 'admin') return;
+                    const activeClass = (viewingUser === username) ? 'active' : '';
+                    const ownClass = (username === currentUser) ? 'own' : '';
+                    const label = username === currentUser ? 
+                        (currentLang==='zh'? `${username} (我)` : `${username} (moi)`) : 
+                        username;
+                    html += `<button class="user-button ${activeClass} ${ownClass}" data-user="${username}" data-userid="${user.id}">👤 ${label}</button>`;
                 });
                 userSelectorButtons.innerHTML = html;
 
                 document.querySelectorAll('.user-button').forEach(btn => {
                     btn.addEventListener('click', () => {
                         const user = btn.dataset.user;
+                        const userId = btn.dataset.userid;
                         viewingUser = user;
+                        viewingUserId = userId;
                         renderUserSelector();
                         renderDriverTabs();
                         renderCustomerList();
@@ -962,7 +915,6 @@
                 });
             }
 
-            // 更新录入区域状态
             function updateInputSectionState() {
                 if (viewingUser === currentUser) {
                     inputSection.classList.remove('disabled');
@@ -971,17 +923,6 @@
                 }
             }
 
-            // 登出
-            function logout() {
-                currentUser = null;
-                viewingUser = null;
-                appContainer.style.display = 'none';
-                loginOverlay.style.display = 'flex';
-                loginUsername.value = '';
-                loginPassword.value = '';
-            }
-
-            // 登录按钮
             loginBtn.addEventListener('click', async () => {
                 const username = loginUsername.value.trim();
                 const password = loginPassword.value.trim();
@@ -991,12 +932,10 @@
                 }
             });
 
-            // 回车登录
             loginPassword.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') loginBtn.click();
             });
 
-            // 显示注册界面
             showRegister.addEventListener('click', () => {
                 loginOverlay.style.display = 'none';
                 registerOverlay.style.display = 'flex';
@@ -1007,7 +946,6 @@
                 loginOverlay.style.display = 'flex';
             });
 
-            // 注册
             registerBtn.addEventListener('click', async () => {
                 const username = regUsername.value.trim();
                 const password = regPassword.value.trim();
@@ -1022,35 +960,18 @@
                     return;
                 }
                 
-                // 简单注册，实际应该用 Supabase Auth
-                users.push(username);
-                alert(currentLang === 'zh' ? '注册成功，请登录' : 'Inscription réussie');
-                registerOverlay.style.display = 'none';
-                loginOverlay.style.display = 'flex';
-                regUsername.value = '';
-                regPassword.value = '';
-                regConfirm.value = '';
+                const success = await register(username, password);
+                if (success) {
+                    registerOverlay.style.display = 'none';
+                    loginOverlay.style.display = 'flex';
+                    regUsername.value = '';
+                    regPassword.value = '';
+                    regConfirm.value = '';
+                }
             });
 
             logoutBtn.addEventListener('click', logout);
 
-            // 管理员添加用户
-            addUserBtn.addEventListener('click', async () => {
-                if (currentUser !== 'admin') return;
-                const username = newUserName.value.trim();
-                const password = newUserPassword.value.trim();
-                if (!username || !password) {
-                    alert('Veuillez remplir tous les champs');
-                    return;
-                }
-                users.push(username);
-                alert('Utilisateur créé');
-                newUserName.value = '';
-                newUserPassword.value = '';
-                renderUserSelector();
-            });
-
-            // 渲染司机选项卡
             function renderDriverTabs() {
                 const drivers = ['Edwin', 'Jismon', 'Wang'];
                 let html = '';
@@ -1071,7 +992,6 @@
                 });
             }
 
-            // 日期变更
             inputDatePicker.addEventListener('change', (e) => {
                 inputDate = e.target.value;
                 updateHints();
@@ -1086,15 +1006,14 @@
 
             // ==================== 数据库操作 ====================
 
-            // 获取查看日期的数据
             async function getViewDateDeliveries() {
-                if (!viewingUser) return [];
+                if (!viewingUserId) return [];
                 
                 try {
                     const { data, error } = await supabase
                         .from('customers')
                         .select('*')
-                        .eq('username', viewingUser)
+                        .eq('user_id', viewingUserId)
                         .eq('driver', currentDriver)
                         .eq('date', viewDate);
                     
@@ -1106,12 +1025,12 @@
                 }
             }
 
-            // 保存顾客到数据库
             async function saveCustomer(customer) {
                 try {
                     const { error } = await supabase
                         .from('customers')
                         .insert([{
+                            user_id: currentUserId,
                             customer_id: customer.id,
                             username: currentUser,
                             driver: currentDriver,
@@ -1133,14 +1052,13 @@
                 }
             }
 
-            // 更新顾客（用于标记出发）
             async function updateCustomer(customerId, updates) {
                 try {
                     const { error } = await supabase
                         .from('customers')
                         .update(updates)
                         .eq('customer_id', customerId)
-                        .eq('username', viewingUser)
+                        .eq('user_id', viewingUserId)
                         .eq('driver', currentDriver)
                         .eq('date', viewDate);
                     
@@ -1151,14 +1069,13 @@
                 }
             }
 
-            // 删除顾客
             async function deleteCustomerFromCloud(customerId) {
                 try {
                     const { error } = await supabase
                         .from('customers')
                         .delete()
                         .eq('customer_id', customerId)
-                        .eq('username', currentUser)
+                        .eq('user_id', currentUserId)
                         .eq('driver', currentDriver)
                         .eq('date', viewDate);
                     
@@ -1169,7 +1086,6 @@
                 }
             }
 
-            // 获取时间输入值
             function getTimeValue() {
                 const type = timeType.value;
                 if (type === 'fixed') {
@@ -1187,7 +1103,6 @@
                 }
             }
 
-            // 格式化显示时间要求
             function formatTimeRequirement(customer) {
                 const t = customer.timeReq;
                 if (!t) return '';
@@ -1197,14 +1112,12 @@
                 return '⏰ Libre';
             }
 
-            // 格式化添加时间
             function formatAddedTime(timestamp) {
                 if (!timestamp) return '';
                 const date = new Date(timestamp);
                 return date.toLocaleString([], { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
             }
 
-            // 添加顾客
             async function addCustomer() {
                 if (viewingUser !== currentUser) {
                     alert(currentLang === 'zh' ? '只能在自己的数据中添加顾客' : 'Vous ne pouvez ajouter que dans vos propres données');
@@ -1253,7 +1166,6 @@
             }
             addBtn.addEventListener('click', addCustomer);
 
-            // 删除顾客
             async function deleteCustomer(custId) {
                 if (viewingUser !== currentUser) {
                     alert(currentLang === 'zh' ? '不能删除其他用户的数据' : 'Vous ne pouvez pas supprimer les données d\'autres utilisateurs');
@@ -1272,7 +1184,6 @@
                 }
             }
 
-            // 标记顾客出发
             async function markCustomerDeparted(custId) {
                 try {
                     loadingMessage.style.display = 'block';
@@ -1289,7 +1200,6 @@
                 }
             }
 
-            // 渲染顾客列表
             async function renderCustomerList() {
                 try {
                     loadingMessage.style.display = 'block';
@@ -1376,7 +1286,6 @@
                 });
             }
 
-            // 路线规划
             async function optimizeRoute() {
                 try {
                     loadingMessage.style.display = 'block';
@@ -1470,11 +1379,9 @@
 
             optimizeBtn.addEventListener('click', optimizeRoute);
 
-            // 初始化
             setDefaultDates();
             renderTimeInput();
             
-            // 默认显示登录界面
             loginOverlay.style.display = 'flex';
             appContainer.style.display = 'none';
             setLanguage('fr');
